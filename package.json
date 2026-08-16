@@ -1,0 +1,14 @@
+{
+  "name": "frontend-system-design-course",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --no-warnings --experimental-sqlite course/server.mjs",
+    "seed": "npm run seed:roadmap && npm run seed:questions && npm run seed:practice",
+    "seed:roadmap": "node --no-warnings --experimental-sqlite course/seed.mjs",
+    "seed:questions": "node --no-warnings --experimental-sqlite course/seed-questions.mjs",
+    "seed:practice": "node --no-warnings --experimental-sqlite course/seed-practice.mjs",
+    "course": "node --no-warnings --experimental-sqlite course/cli.mjs",
+    "practice": "node --no-warnings --experimental-strip-types --test \"practice/**/*.test.ts\""
+  }
+}
