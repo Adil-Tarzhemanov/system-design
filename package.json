@@ -12,6 +12,7 @@
     "seed:questions": "node --no-warnings --experimental-sqlite course/seed-questions.mjs",
     "seed:practice": "node --no-warnings --experimental-sqlite course/seed-practice.mjs",
     "course": "node --no-warnings --experimental-sqlite course/cli.mjs",
+    "icons": "node course/make-icons.mjs",
     "practice": "node --no-warnings --experimental-strip-types --test \"practice/**/*.test.ts\""
   }
 }

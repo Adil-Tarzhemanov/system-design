@@ -1,11 +1,26 @@
 import { createServer } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
 import { openDb, all, one, run, ROOT } from './db.mjs';
 
 const PORT = Number(process.env.PORT || 4173);
+const PUBLIC = join(ROOT, 'course', 'public');
 const db = openDb();
+
+// Версия кэшей service worker. Считается от статики и текстов уроков:
+// поменялся хоть один — установленное приложение сбрасывает старый кэш.
+const SHELL_VERSION = (() => {
+  const h = createHash('sha1');
+  for (const f of ['style.css', 'sw.js', 'manifest.webmanifest']) h.update(readFileSync(join(PUBLIC, f)));
+  const lessons = join(ROOT, 'course', 'lessons');
+  for (const f of readdirSync(lessons).sort()) {
+    h.update(f);
+    h.update(readFileSync(join(lessons, f)));
+  }
+  return h.digest('hex').slice(0, 12);
+})();
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -62,6 +77,14 @@ function layout(title, body, active = '') {
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} — Frontend System Design</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#14161a">
+<link rel="icon" href="/static/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="System Design">
 <link rel="stylesheet" href="/static/style.css">
 </head><body>
 <aside class="side">
@@ -77,6 +100,7 @@ function layout(title, body, active = '') {
   <div class="tree">${tree}</div>
 </aside>
 <main class="main">${body}</main>
+<script>navigator.serviceWorker?.register('/sw.js');</script>
 </body></html>`;
 }
 
@@ -230,10 +254,12 @@ function pageLesson(num) {
     </nav>
     <script>
     document.querySelectorAll('.sbtn').forEach(b => b.onclick = async () => {
-      await fetch('/api/lesson/' + b.dataset.num + '/status', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ status: b.dataset.status }) });
-      location.reload();
+      try {
+        await fetch('/api/lesson/' + b.dataset.num + '/status', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ status: b.dataset.status }) });
+        location.reload();
+      } catch { b.textContent = 'нет сети'; }
     });
     </script>`;
   return layout(`${pad(l.num)} · ${l.title}`, body, `/lesson/${num}`);
@@ -302,7 +328,33 @@ function pageMocks() {
       </div>`).join('')}</section>`, '/mocks');
 }
 
+// Запасная страница service worker: показывается, когда сети нет,
+// а запрошенную страницу на этом устройстве ещё ни разу не открывали.
+function pageOffline() {
+  return layout('Офлайн', `
+    <header class="head"><h1>Офлайн</h1>
+    <p class="lead">Сети нет, а эта страница ни разу не открывалась с устройства —
+    показать нечего. Уроки, которые ты уже читал, доступны без сети: открой их
+    из списка уроков.</p></header>`);
+}
+
 // ---------------------------------------------------------------- роутер
+
+const MIME = {
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png',
+};
+const mimeOf = (f) => MIME[f.slice(f.lastIndexOf('.'))] ?? 'application/octet-stream';
+
+// sw.js обязан отдаваться из корня, иначе его scope не покроет весь сайт.
+// Манифест и apple-touch-icon браузеры тоже ищут именно там.
+const ROOT_FILES = {
+  '/sw.js': 'sw.js',
+  '/manifest.webmanifest': 'manifest.webmanifest',
+  '/apple-touch-icon.png': 'apple-touch-icon.png',
+};
 
 const send = (res, code, type, body) => {
   res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' });
@@ -334,15 +386,18 @@ export function handler(req, res) {
     return send(res, 404, 'text/plain', 'not found');
   }
 
-  if (p.startsWith('/static/')) {
-    const f = join(ROOT, 'course', 'public', p.slice('/static/'.length));
-    if (!f.startsWith(join(ROOT, 'course', 'public')) || !existsSync(f)) return send(res, 404, 'text/plain', '404');
-    const type = f.endsWith('.css') ? 'text/css' : f.endsWith('.js') ? 'text/javascript' : 'application/octet-stream';
-    return send(res, 200, `${type}; charset=utf-8`, readFileSync(f));
+  if (ROOT_FILES[p] || p.startsWith('/static/')) {
+    const f = join(PUBLIC, ROOT_FILES[p] ?? p.slice('/static/'.length));
+    if (!f.startsWith(PUBLIC) || !existsSync(f)) return send(res, 404, 'text/plain', '404');
+    const body = p === '/sw.js'
+      ? readFileSync(f, 'utf8').replaceAll('__VERSION__', SHELL_VERSION)
+      : readFileSync(f);
+    return send(res, 200, mimeOf(f), body);
   }
 
   let html = null;
   if (p === '/') html = pageRoadmap();
+  else if (p === '/offline') html = pageOffline();
   else if (p === '/review') html = pageReview();
   else if (p === '/mistakes') html = pageMistakes();
   else if (p === '/mocks') html = pageMocks();
