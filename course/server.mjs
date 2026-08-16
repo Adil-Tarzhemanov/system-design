@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { openDb, all, one, run, ROOT } from './db.mjs';
 
 const PORT = Number(process.env.PORT || 4173);
@@ -308,7 +309,7 @@ const send = (res, code, type, body) => {
   res.end(body);
 };
 
-createServer((req, res) => {
+export function handler(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const p = url.pathname;
 
@@ -351,6 +352,11 @@ createServer((req, res) => {
   }
   if (!html) return send(res, 404, 'text/html; charset=utf-8', layout('404', '<div class="empty"><h2>Нет такой страницы</h2></div>'));
   send(res, 200, 'text/html; charset=utf-8', html);
-}).listen(PORT, () => {
-  console.log(`курс: http://localhost:${PORT}`);
-});
+}
+
+// Локальный запуск: `npm start`. На Vercel этот модуль импортит api/index.mjs.
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  createServer(handler).listen(PORT, () => {
+    console.log(`курс: http://localhost:${PORT}`);
+  });
+}
