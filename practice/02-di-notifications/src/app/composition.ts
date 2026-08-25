@@ -1,9 +1,11 @@
 // Корень композиции: единственное место, которому разрешено знать одновременно
-// и про notifications, и про конкретный транспорт.
-//
-// Сейчас он пустой по смыслу — просто пробрасывает функцию наружу, потому что связывать
-// нечего: notifications уже держит транспорт внутри себя. После рефакторинга собирать
-// зависимости должен именно этот файл.
-import { notifyUser, notifyAll } from '../notifications/notify.ts';
+// и про notifications, и про конкретный транспорт. После рефакторинга вся конкретика
+// живёт здесь — и это ровно то, ради чего упражнение делалось.
+import { createNotifier } from '../notifications/notify.ts';
+import { sendTelegram } from '../transport/telegram.ts';
 
-export const notifier = { notifyUser, notifyAll };
+// { send: sendTelegram } — это адаптер целиком. Он подошёл под тип Transport
+// по структуре, без implements: сигнатуры совпали, значит, годится.
+export const notifier = createNotifier({
+  transport: { send: sendTelegram },
+});
