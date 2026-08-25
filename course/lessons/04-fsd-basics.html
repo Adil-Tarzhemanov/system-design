@@ -1,0 +1,588 @@
+<p class="lead" style="margin-bottom:28px">
+Хорошая новость: <strong>ничего принципиально нового в этом уроке нет</strong>.
+FSD — это правило направления из урока 3, доведённое до готового свода соглашений,
+где у каждого этажа есть имя и заранее известно, кому что можно. Плохая новость:
+имён много, их путают, и на собеседовании это слышно сразу.
+</p>
+
+<div class="interview">
+  <div class="boxtitle">Зачем это на собесе</div>
+  <p>FSD сейчас спрашивают почти на каждом фронтовом собесе в СНГ — в Kaspi, Freedom,
+  inDrive он встречается в вакансиях прямым текстом. Спрашивают три вещи: назови слои по порядку;
+  сформулируй правила импортов; расскажи, за что FSD ругают. На третьем вопросе
+  выигрывают: заученный ответ «FSD это круто» слабее честного «вот три места, где он мешает,
+  и вот как мы их решали».</p>
+</div>
+
+<div class="quizscore" data-quiz-score>По ходу урока будут задания.</div>
+
+<h2>Словарь урока</h2>
+
+<table>
+  <tr><th>Слово</th><th>Что значит</th></tr>
+  <tr><td><strong>FSD</strong></td><td>Feature-Sliced Design. Не библиотека и не фреймворк — свод правил, как раскладывать код.</td></tr>
+  <tr><td><strong>Слой</strong> (layer)</td><td>Этаж. Делит код по <em>области влияния</em>: насколько глобально решение. Слоёв ровно шесть, их имена фиксированы.</td></tr>
+  <tr><td><strong>Слайс</strong> (slice)</td><td>Вертикальная нарезка внутри слоя по <em>предметной области</em>: <code>user</code>, <code>order</code>, <code>cart</code>. Имена придумываешь ты.</td></tr>
+  <tr><td><strong>Сегмент</strong> (segment)</td><td>Нарезка внутри слайса по <em>техническому назначению</em>: <code>ui</code>, <code>model</code>, <code>api</code>, <code>lib</code>.</td></tr>
+  <tr><td><strong>Публичный API</strong></td><td>Файл <code>index.ts</code> слайса — единственная разрешённая дверь внутрь. Из урока 1.</td></tr>
+  <tr><td><strong>Кросс-импорт</strong></td><td>Импорт между двумя слайсами одного слоя. Запрещён.</td></tr>
+  <tr><td><strong>Юзкейс</strong></td><td>Действие пользователя: войти, добавить в корзину, отменить заказ. В FSD живёт в <code>features</code>.</td></tr>
+</table>
+
+<h2>1. Что такое FSD и чем он не является</h2>
+
+<p>Определение самих авторов:</p>
+
+<blockquote>
+Feature-Sliced Design — архитектурная методология для проектирования фронтенд-приложений.
+Проще говоря, это свод правил и соглашений по организации кода.
+</blockquote>
+
+<div class="termdef">
+  <b>Методология</b>, а не архитектура — важное различие. Архитектура сказала бы
+  «пусть будут фичи и общий слой». Методология идёт дальше: даёт конкретные имена,
+  жёсткие правила, линтер-плагины и ответ на вопрос «а куда положить вот это».
+</div>
+
+<p>Что FSD <strong>не</strong> является:</p>
+
+<ul>
+  <li><strong>Не библиотека.</strong> Ставить нечего, это соглашение между людьми.</li>
+  <li><strong>Не структура папок.</strong> Папки — следствие. Разложить файлы по правильным
+  именам и нарушить все правила внутри можно за один вечер.</li>
+  <li><strong>Не гарантия качества.</strong> «У нас FSD» — это про раскладку, а не про архитектуру.
+  Помнишь вопрос из урока 1 про «у нас хорошая архитектура, мы используем RTK и FSD»?</li>
+</ul>
+
+<h2>2. Три оси деления — главная идея</h2>
+
+<p>Обычно код делят по одной оси: или по типам файлов (<code>components/ hooks/ utils/</code>),
+или по фичам (<code>orders/ cart/</code>). FSD делит по трём осям <strong>одновременно</strong>,
+и каждая отвечает на свой вопрос.</p>
+
+<svg viewBox="0 0 640 250" role="img" aria-label="Схема трёх осей: слои горизонтальными полосами, слайсы вертикальными колонками внутри слоя, сегменты внутри слайса" style="margin:6px 0 10px">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="14" y="34" width="380" height="46" rx="8"/>
+    <rect x="14" y="90" width="380" height="46" rx="8"/>
+    <rect x="14" y="146" width="380" height="46" rx="8"/>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.55">
+    <rect x="126" y="96" width="80" height="34" rx="6"/>
+    <rect x="214" y="96" width="80" height="34" rx="6"/>
+    <rect x="302" y="96" width="80" height="34" rx="6"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui">
+    <text x="28" y="62" font-size="12.5">pages</text>
+    <text x="28" y="118" font-size="12.5">features</text>
+    <text x="28" y="174" font-size="12.5">entities</text>
+    <text x="140" y="117" font-size="11">auth</text>
+    <text x="228" y="117" font-size="11">cart</text>
+    <text x="316" y="117" font-size="11">search</text>
+    <text x="14" y="24" font-size="11.5" opacity="0.7">слой — область влияния</text>
+    <text x="126" y="86" font-size="11.5" opacity="0.7">слайс — предметная область</text>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.7">
+    <rect x="440" y="60" width="186" height="130" rx="9"/>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.1" opacity="0.5">
+    <rect x="456" y="92" width="154" height="24" rx="5"/>
+    <rect x="456" y="122" width="154" height="24" rx="5"/>
+    <rect x="456" y="152" width="154" height="24" rx="5"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui">
+    <text x="456" y="82" font-size="11.5">features/cart</text>
+    <text x="466" y="108" font-size="11">ui — кнопка, форма</text>
+    <text x="466" y="138" font-size="11">model — состояние, логика</text>
+    <text x="466" y="168" font-size="11">api — запросы</text>
+    <text x="440" y="50" font-size="11.5" opacity="0.7">сегмент — техническое назначение</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.3" opacity="0.55">
+    <path d="M298 113 L434 113" stroke-dasharray="4 3" marker-end="url(#c1)"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="10.5" opacity="0.6">
+    <text x="14" y="222">Путь к файлу читается как адрес:</text>
+    <text x="14" y="240">features / cart / ui / AddToCartButton.tsx  =  слой / слайс / сегмент / файл</text>
+  </g>
+  <defs><marker id="c1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+
+<table>
+  <tr><th>Ось</th><th>Отвечает на вопрос</th><th>Имена</th></tr>
+  <tr><td><strong>Слой</strong></td><td>Насколько глобально это решение?</td><td>Фиксированы: их ровно шесть</td></tr>
+  <tr><td><strong>Слайс</strong></td><td>О чём это? Про заказ, про пользователя?</td><td>Придумываешь сам, по своему домену</td></tr>
+  <tr><td><strong>Сегмент</strong></td><td>Что это технически — разметка, логика, запрос?</td><td>Соглашение: <code>ui</code>, <code>model</code>, <code>api</code>, <code>lib</code>, <code>config</code></td></tr>
+</table>
+
+<div class="quiz" data-quiz="match" data-id="l4-axes">
+  <div class="qhead">Задание 1 — соедини пары</div>
+  <p class="qtext">Нажми слева, потом справа.</p>
+  <ul class="qpairs">
+    <li data-term="Слой">Делит по области влияния, имён ровно шесть</li>
+    <li data-term="Слайс">Делит по предметной области, имена свои</li>
+    <li data-term="Сегмент">Делит по техническому назначению внутри слайса</li>
+    <li data-term="Публичный API">Единственная разрешённая дверь внутрь слайса</li>
+  </ul>
+</div>
+
+<div class="quiz" data-quiz="choice" data-id="l4-segment">
+  <div class="qhead">Задание 2</div>
+  <p class="qtext">Внутри слайса <code>features/add-to-cart</code> лежат три файла.
+  Какой из них попадёт в сегмент <code>model</code>?</p>
+  <ul class="qopts">
+    <li data-why="Это разметка и внешний вид — сегмент ui. Сегмент отвечает на вопрос «что это технически».">
+      <code>AddToCartButton.tsx</code> — кнопка с вёрсткой
+    </li>
+    <li data-ok data-why="Верно: состояние и логика слайса — это model. Туда же уходят сторы, хуки с логикой и правила.">
+      <code>useAddToCart.ts</code> — состояние и логика добавления
+    </li>
+    <li data-why="Запросы к серверу — сегмент api. Он про общение с внешним миром, а не про логику слайса.">
+      <code>postCartItem.ts</code> — запрос на сервер
+    </li>
+  </ul>
+  <div class="qafter">Сегменты — соглашение, а не жёсткое правило: <code>ui</code>, <code>model</code>,
+  <code>api</code>, плюс <code>lib</code> и <code>config</code> по необходимости.
+  Заводить все пять в каждом слайсе не нужно — только те, что реально есть.</div>
+</div>
+
+<h2>3. Шесть слоёв сверху вниз</h2>
+
+<svg viewBox="0 0 640 270" role="img" aria-label="Шесть слоёв FSD: app, pages, widgets, features, entities, shared сверху вниз" style="margin:6px 0 10px">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="150" y="12" width="340" height="36" rx="8"/>
+    <rect x="132" y="54" width="376" height="36" rx="8"/>
+    <rect x="114" y="96" width="412" height="36" rx="8"/>
+    <rect x="96" y="138" width="448" height="36" rx="8"/>
+    <rect x="78" y="180" width="484" height="36" rx="8"/>
+    <rect x="60" y="222" width="520" height="36" rx="8"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="12">
+    <text x="166" y="35">app · инициализация, провайдеры, роутер</text>
+    <text x="148" y="77">pages · страницы целиком</text>
+    <text x="130" y="119">widgets · самодостаточные куски интерфейса</text>
+    <text x="112" y="161">features · действия пользователя</text>
+    <text x="94" y="203">entities · бизнес-сущности</text>
+    <text x="76" y="245">shared · инфраструктура без домена</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.4" opacity="0.6">
+    <path d="M30 20 L30 250" marker-end="url(#c2)"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="10" opacity="0.62">
+    <text x="4" y="100">меняется</text>
+    <text x="4" y="114">реже</text>
+    <text x="600" y="30">чаще</text>
+    <text x="600" y="240">реже</text>
+    <text x="600" y="44">всего</text>
+  </g>
+  <defs><marker id="c2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+<p class="figcap">Это ровно та лестница устойчивости из урока 3 — просто у этажей появились имена.</p>
+
+<table>
+  <tr><th>Слой</th><th>Что там живёт</th><th>Пример</th></tr>
+  <tr><td><code>app</code></td><td>Запуск приложения: провайдеры, роутер, глобальные стили. Композиционный корень из урока 2</td><td><code>app/providers/QueryProvider.tsx</code></td></tr>
+  <tr><td><code>pages</code></td><td>Страницы целиком, по одной на слайс. Плоский список — по нему видно всё приложение</td><td><code>pages/checkout</code></td></tr>
+  <tr><td><code>widgets</code></td><td>Самодостаточный кусок интерфейса, который можно поставить на любую страницу</td><td><code>widgets/header</code>, <code>widgets/order-card</code></td></tr>
+  <tr><td><code>features</code></td><td>Действия пользователя — юзкейсы. Обычно кнопка плюс логика за ней</td><td><code>features/add-to-cart</code></td></tr>
+  <tr><td><code>entities</code></td><td>Бизнес-сущности: то, над чем совершают действия</td><td><code>entities/product</code>, <code>entities/user</code></td></tr>
+  <tr><td><code>shared</code></td><td>Инфраструктура: ui-кит, http-клиент, утилиты. <strong>Ни одного слова из домена</strong></td><td><code>shared/ui/Button</code>, <code>shared/api/client</code></td></tr>
+</table>
+
+<div class="note">
+  <div class="boxtitle">Мнемоника для порядка слоёв</div>
+  <p>Сверху вниз — <strong>от «что видит пользователь» к «из чего это сделано»</strong>.
+  Приложение → страница → блок на странице → действие → предмет действия → кирпичи.
+  Если на собесе сбился, восстанавливай по этой цепочке, а не по заученному списку.</p>
+</div>
+
+<div class="quiz" data-quiz="choice" data-id="l4-layer-pick">
+  <div class="qhead">Задание 3</div>
+  <p class="qtext">Куда положить компонент «карточка товара», который показывает картинку,
+  название, цену и кнопку «в корзину»?</p>
+  <ul class="qopts">
+    <li data-why="Кнопка «в корзину» — это действие пользователя, то есть features. Но карточка целиком больше, чем одно действие.">
+      Целиком в <code>features/add-to-cart</code>
+    </li>
+    <li data-ok data-why="Верно: разрезать. Отображение товара — entities/product, кнопка с логикой — features/add-to-cart, а собирает их widgets/product-card через слот.">
+      Разрезать: показ товара в <code>entities</code>, кнопку в <code>features</code>, сборку в <code>widgets</code>
+    </li>
+    <li data-why="В shared нельзя: карточка знает слово «товар», то есть знает домен. Это ошибка из урока 3.">
+      В <code>shared/ui</code>, ведь карточка нужна на многих страницах
+    </li>
+  </ul>
+  <div class="qafter">Приём сборки через слот — ровно тот, что был в уроке 2:
+  сущность объявляет <code>ReactNode</code>, фича кладёт туда кнопку, виджет их соединяет.</div>
+</div>
+
+<h2>4. Правило первое: импорты только вниз</h2>
+
+<div class="termdef">
+  <b>Правило слоёв</b> — модуль может импортировать только те слои, что лежат <em>ниже</em> его.
+  Через слой вниз — можно. Вверх и вбок — нельзя.
+</div>
+
+<svg viewBox="0 0 640 220" role="img" aria-label="Стрелки вниз и через слой вниз разрешены, стрелка вверх и стрелка вбок запрещены" style="margin:6px 0 10px">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="150" y="16" width="300" height="34" rx="8"/>
+    <rect x="150" y="66" width="300" height="34" rx="8"/>
+    <rect x="150" y="116" width="140" height="34" rx="8"/>
+    <rect x="310" y="116" width="140" height="34" rx="8"/>
+    <rect x="150" y="166" width="300" height="34" rx="8"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="12">
+    <text x="166" y="38">pages</text>
+    <text x="166" y="88">widgets</text>
+    <text x="166" y="138">features/auth</text>
+    <text x="326" y="138">features/cart</text>
+    <text x="166" y="188">entities</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.5" opacity="0.8">
+    <path d="M126 24 L126 92" marker-end="url(#c4)"/>
+    <path d="M110 24 L110 178" marker-end="url(#c4)"/>
+    <path d="M474 190 L474 46" marker-end="url(#c4)" opacity="0.4"/>
+    <path d="M292 133 L304 133" marker-end="url(#c4)" opacity="0.4"/>
+  </g>
+  <g stroke="currentColor" stroke-width="2" opacity="0.7">
+    <path d="M464 106 L484 126 M484 106 L464 126"/>
+    <path d="M290 152 L306 168 M306 152 L290 168"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="11" opacity="0.68">
+    <text x="14" y="60">вниз —</text>
+    <text x="14" y="76">можно</text>
+    <text x="14" y="140">через слой</text>
+    <text x="14" y="156">вниз — тоже</text>
+    <text x="500" y="116">вверх —</text>
+    <text x="500" y="132">нельзя</text>
+    <text x="248" y="212">вбок, между соседями по слою — тоже нельзя</text>
+  </g>
+  <defs><marker id="c4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+<p class="figcap">Разрешено только движение вниз. Перепрыгивать через слой при этом можно — запрещено именно направление, а не расстояние.</p>
+
+<p>Это то же самое правило направления из урока 3, только теперь этажи пронумерованы заранее.
+Вот как выглядит нарушение — пример из упражнения к этому уроку:</p>
+
+<pre><code>// widgets/header/ui.ts
+import { PAGE_TITLE } from '../../pages/home/meta.ts';   // ← вверх: widgets тянет pages
+
+export function renderHeader(): string {
+  return `${upper(PAGE_TITLE)} · ${displayName()}`;
+}</code></pre>
+
+<div class="warnbox">
+  <div class="boxtitle">Почему это плохо — не «так принято»</div>
+  <p>Виджет шапки теперь <strong>перестал быть виджетом</strong>. Он больше не самодостаточный
+  кусок интерфейса, а деталь главной страницы: поставь его на страницу заказа —
+  и он покажет заголовок главной. Причём код при этом работает и тесты на поведение зелёные.
+  Нарушение слоёв не ломает приложение сразу — оно ломает возможность переиспользовать,
+  и выясняется это в проде.</p>
+</div>
+
+<p>Лечение всегда одно и то же: <strong>параметризация вместо похода наверх</strong>.
+Нижнему слою нужны данные из верхнего — он не идёт за ними, а принимает аргументом.
+Кто выше, тот и знает, что подставить.</p>
+
+<pre><code>// widgets/header/ui.ts — теперь виджет работает на любой странице
+export function renderHeader(title: string): string {
+  return `${upper(title)} · ${displayName()}`;
+}
+
+// pages/home/ui.ts — страница знает свой заголовок и передаёт его вниз
+export function renderHome(): string {
+  return renderHeader(PAGE_TITLE);
+}</code></pre>
+
+<div class="quiz" data-quiz="choice" data-id="l4-up">
+  <div class="qhead">Задание 4</div>
+  <p class="qtext">Какое из трёх нарушений опаснее остальных?</p>
+  <pre><code>entities/user  →  features/auth      // сущность знает про фичу
+shared/format  →  entities/user      // утилита знает про домен
+widgets/header →  pages/home         // виджет знает про страницу</code></pre>
+  <ul class="qopts">
+    <li data-ok data-why="Верно. Shared — самый нижний слой, на него завязано всё приложение. Одна доменная зависимость внизу тянет домен во все места сразу и делает shared непереносимым.">
+      <code>shared → entities</code>: заражён самый нижний слой
+    </li>
+    <li data-why="Плохо, но локально: страдает один виджет. Он перестаёт быть переиспользуемым, но остальное приложение это не тянет.">
+      <code>widgets → pages</code>: виджет перестал быть виджетом
+    </li>
+    <li data-why="Тоже плохо и тоже поправимо параметризацией, но радиус меньше: страдает одна сущность, а не весь фундамент.">
+      <code>entities → features</code>: сущность знает про действие
+    </li>
+  </ul>
+  <div class="qafter">Критерий тот же, что в уроке 3: <strong>чем ниже слой, тем дороже
+  в нём нарушение</strong> — потому что тем больше на него завязано.</div>
+</div>
+
+<h2>5. Правило второе: запрет кросс-импортов</h2>
+
+<div class="termdef">
+  <b>Кросс-импорт</b> — импорт между двумя слайсами <em>одного</em> слоя:
+  <code>features/cart</code> тянет <code>features/checkout</code>. Запрещён.
+</div>
+
+<svg viewBox="0 0 640 200" role="img" aria-label="Два слайса одного слоя не могут импортировать друг друга, вместо этого их соединяет слой выше" style="margin:6px 0 10px">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="20" y="110" width="150" height="46" rx="9"/>
+    <rect x="230" y="110" width="150" height="46" rx="9"/>
+    <rect x="440" y="110" width="180" height="46" rx="9"/>
+    <rect x="440" y="24" width="180" height="42" rx="9"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="12">
+    <text x="36" y="138">features/cart</text>
+    <text x="246" y="138">features/checkout</text>
+    <text x="456" y="130">features/cart</text>
+    <text x="456" y="148" font-size="10.5" opacity="0.6">и checkout рядом</text>
+    <text x="456" y="50">widgets или pages</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.5" opacity="0.75">
+    <path d="M170 133 L224 133" marker-end="url(#c3)"/>
+    <path d="M500 66 L500 104" marker-end="url(#c3)"/>
+    <path d="M560 66 L560 104" marker-end="url(#c3)"/>
+  </g>
+  <g stroke="currentColor" stroke-width="2" opacity="0.7">
+    <path d="M188 122 L206 144 M206 122 L188 144"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="11" opacity="0.68">
+    <text x="20" y="94">нельзя: соседи по слою</text>
+    <text x="440" y="94">можно: соединяет тот, кто выше</text>
+    <text x="20" y="184">Смысл запрета: когда меняется одна фича, соседняя меняться не должна.</text>
+  </g>
+  <defs><marker id="c3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+
+<p>Правило кажется избыточным — но именно оно не даёт слою превратиться в кашу.
+Если слайсы могут звать друг друга, через полгода <code>features</code> — это один
+большой комок, из которого нельзя вынуть ни одну фичу.</p>
+
+<p>Что делать, когда фичам всё-таки надо общаться — три выхода, в порядке предпочтения:</p>
+
+<ol>
+  <li><strong>Поднять сборку наверх</strong> — соединить их в <code>widgets</code> или на странице.
+  Приём номер один из урока 3.</li>
+  <li><strong>Опустить общее вниз</strong> — если обе фичи нуждаются в одном и том же знании,
+  это знание про сущность, и место ему в <code>entities</code>.</li>
+  <li><strong>Слот или колбэк</strong> — фича объявляет <code>ReactNode</code> или <code>onDone</code>,
+  а кто их заполнит, решает слой выше. Инверсия из урока 2.</li>
+</ol>
+
+<div class="quiz" data-quiz="choice" data-id="l4-cross">
+  <div class="qhead">Задание 5</div>
+  <p class="qtext">После успешного <code>features/login</code> надо очистить
+  <code>features/cart</code>. Прямой импорт запрещён. Как правильно?</p>
+  <ul class="qopts">
+    <li data-why="Это тот же кросс-импорт, просто спрятанный: login по-прежнему знает про существование корзины и её внутреннее устройство.">
+      Импортировать <code>clearCart</code> внутрь <code>login</code> через <code>shared</code>
+    </li>
+    <li data-ok data-why="Верно. Фича логина объявляет колбэк onSuccess и не знает, что произойдёт. Что именно вызвать — решает страница, которая видит обе фичи.">
+      <code>login</code> объявляет <code>onSuccess</code>, а страница вызывает в нём очистку
+    </li>
+    <li data-why="Слить две фичи в одну — значит потерять границу между ними. Через месяц туда же приедет третье действие, и получится комок.">
+      Объединить обе фичи в одну <code>features/auth-and-cart</code>
+    </li>
+  </ul>
+</div>
+
+<h2>6. Правило третье: публичный API слайса</h2>
+
+<p>У каждого слайса есть <code>index.ts</code> — единственная разрешённая дверь.
+Снаружи импортируют только из него, внутренности недоступны.</p>
+
+<svg viewBox="0 0 640 210" role="img" aria-label="Слайс как коробка с единственной дверью index.ts: импорт через дверь разрешён, импорт напрямую во внутренний файл запрещён" style="margin:6px 0 10px">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="250" y="20" width="250" height="170" rx="10"/>
+    <rect x="266" y="34" width="218" height="30" rx="7"/>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.1" opacity="0.5">
+    <rect x="278" y="82" width="194" height="26" rx="6"/>
+    <rect x="278" y="116" width="194" height="26" rx="6"/>
+    <rect x="278" y="150" width="194" height="26" rx="6"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui">
+    <text x="280" y="54" font-size="12">index.ts — витрина</text>
+    <text x="288" y="100" font-size="11" opacity="0.75">ui/ProductCard.tsx</text>
+    <text x="288" y="134" font-size="11" opacity="0.75">model/useProduct.ts</text>
+    <text x="288" y="168" font-size="11" opacity="0.75">model/normalize.ts</text>
+    <text x="256" y="12" font-size="11.5" opacity="0.7">entities/product</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.5" opacity="0.8">
+    <path d="M120 49 L244 49" marker-end="url(#c5)"/>
+    <path d="M120 130 L272 130" marker-end="url(#c5)" opacity="0.4" stroke-dasharray="4 3"/>
+  </g>
+  <g stroke="currentColor" stroke-width="2" opacity="0.7">
+    <path d="M188 120 L206 140 M206 120 L188 140"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="11" opacity="0.68">
+    <text x="14" y="46">import из</text>
+    <text x="14" y="62">@/entities/product</text>
+    <text x="14" y="126">import из</text>
+    <text x="14" y="142">.../ui/ProductCard</text>
+    <text x="516" y="100">внутренности —</text>
+    <text x="516" y="116">частное дело</text>
+    <text x="516" y="132">слайса</text>
+  </g>
+  <defs><marker id="c5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+
+<pre><code>// ✅ entities/product/index.ts — сознательно выбранная витрина
+export { ProductCard } from './ui/ProductCard';
+export { useProduct } from './model/useProduct';
+export type { Product } from './model/types';
+
+// ✅ снаружи
+import { ProductCard } from '@/entities/product';
+
+// ❌ снаружи
+import { ProductCard } from '@/entities/product/ui/ProductCard';</code></pre>
+
+<p>Это дословно тот же публичный API из урока 1. И та же ловушка:</p>
+
+<div class="warnbox">
+  <div class="boxtitle">Ловушка из урока 1, которая жива и здесь</div>
+  <p><code>export * from './model'</code> в <code>index.ts</code> — это <strong>не</strong> публичный API.
+  Формально дверь есть, фактически стена стеклянная: наружу утекает всё,
+  и через полгода на внутреннюю деталь кто-нибудь обязательно завяжется.
+  Публичный API — то, что ты <em>решил</em> показать, а не то, что забыл спрятать.</p>
+</div>
+
+<div class="quiz" data-quiz="reveal" data-id="l4-rules">
+  <div class="qhead">Вспомни, не подглядывая</div>
+  <p class="qtext">Назови все три правила FSD — своими словами, без подсказки.</p>
+  <div class="qanswer"><strong>1.</strong> Импорты идут только вниз по слоям: нижний слой не знает
+  о верхних. <strong>2.</strong> Слайсы одного слоя не импортируют друг друга — никаких кросс-импортов.
+  <strong>3.</strong> Внутрь слайса ходят только через его публичный API — <code>index.ts</code>.</div>
+</div>
+
+<h2>7. За что FSD ругают — честно</h2>
+
+<p>Это тот самый третий вопрос, на котором выигрывают собеседование. Претензии реальные,
+и делать вид, что их нет, — худшая стратегия.</p>
+
+<table>
+  <tr><th>Претензия</th><th>Насколько справедлива</th></tr>
+  <tr><td><strong>Shared превращается в свалку</strong></td><td>Полностью справедлива. Это самое частое место, где FSD-проект гниёт: туда сваливают всё, что «не подошло никуда ещё»</td></tr>
+  <tr><td><strong>Спор «фича или сущность» на каждом ревью</strong></td><td>Справедлива. Граница между <code>features</code> и <code>entities</code> — вопрос вкуса, и команда тратит на него реальное время</td></tr>
+  <tr><td><strong>Много бойлерплейта</strong></td><td>Справедлива. Одна кнопка — папка, сегмент, <code>index.ts</code>. На маленьком проекте это чистый оверхед</td></tr>
+  <tr><td><strong>Кросс-импорты между фичами лезут постоянно</strong></td><td>Справедлива, и это главный источник боли. Реальные фичи связаны сильнее, чем предполагает методология</td></tr>
+  <tr><td><strong>«FSD — это оверинжиниринг»</strong></td><td>Справедлива для маленьких проектов и несправедлива для больших. Вопрос размера команды и срока жизни, а не вкуса</td></tr>
+</table>
+
+<div class="interview">
+  <div class="boxtitle">Как отвечать на «что вам не нравится в FSD»</div>
+  <p>«Больше всего мешал запрет кросс-импортов: реальные фичи связаны сильнее, чем предполагает
+  методология, и половина задач упиралась в вопрос, куда поднять связь. Решали слотами
+  и подъёмом сборки в виджет. Второе — <code>shared</code>: он расползается, если не завести
+  явное правило. У нас правило было такое: в <code>shared</code> не должно встречаться
+  ни одного слова из предметной области, и это проверялось на ревью.»</p>
+</div>
+
+<div class="quiz" data-quiz="choice" data-id="l4-critique">
+  <div class="qhead">Задание 6</div>
+  <p class="qtext">Интервьюер: «а зачем вам FSD, если можно просто делить по фичам?»
+  Какой ответ сильнее?</p>
+  <ul class="qopts">
+    <li data-why="Аргумент от популярности — слабейший из возможных. Он не отвечает на вопрос «что это даёт вам».">
+      «FSD — стандарт, его сейчас используют все»
+    </li>
+    <li data-ok data-why="Верно: назван конкретный эффект и конкретная цена. Именно это отличает человека, работавшего с последствиями решения, от прочитавшего статью.">
+      «Даёт одинаковые имена и проверяемое правило импортов — новый человек знает, где что, а линтер ловит нарушения. Платим бойлерплейтом»
+    </li>
+    <li data-why="Деление по фичам как раз работает, и на маленьком проекте лучше. Утверждение неверно и легко опровергается.">
+      «Деление по фичам не работает, там всегда получается каша»
+    </li>
+  </ul>
+</div>
+
+<h2>8. Что FSD реально решает</h2>
+
+<p>Если убрать маркетинг, остаются три вещи — и все три про людей, а не про код:</p>
+
+<ul>
+  <li><strong>Одинаковые имена.</strong> Новый человек в команде уже знает, что такое
+  <code>entities</code> и где искать запросы. Знание переезжает из «проектного»
+  в «общеотраслевое» — это реально ускоряет онбординг.</li>
+  <li><strong>Правило, которое можно проверить машиной.</strong> Направление импортов
+  проверяется линтером в CI. Договорённость, которую нельзя проверить, не соблюдается.</li>
+  <li><strong>Структура кричит о продукте.</strong> Открыл <code>pages/</code> — увидел
+  всё приложение. Открыл <code>features/</code> — увидел, что пользователь умеет делать.</li>
+</ul>
+
+<h2>9. Как это звучит на собеседовании</h2>
+
+<div class="interview">
+  <div class="boxtitle">Скрипт на 60 секунд</div>
+  <p>«FSD — не библиотека, а свод соглашений. Делит код по трём осям: слой — по области влияния,
+  слайс — по предметной области, сегмент — по техническому назначению. Слоёв шесть, сверху вниз:
+  app, pages, widgets, features, entities, shared. Три правила: импорты только вниз,
+  слайсы одного слоя друг друга не импортируют, внутрь слайса — только через публичный API.
+  По сути это принцип устойчивых зависимостей с готовыми именами: внизу то, что меняется реже,
+  и там нет ни слова про наш домен. Что мешало — запрет кросс-импортов и разрастание shared;
+  решали слотами и явным правилом на ревью.»</p>
+</div>
+
+<div class="warnbox">
+  <div class="boxtitle">Чего не делать</div>
+  <ul>
+    <li>Не путать слайс и сегмент. Слайс — <code>cart</code>, сегмент — <code>ui</code>.</li>
+    <li>Не называть FSD архитектурой. Это методология: правила плюс тулинг.</li>
+    <li>Не отвечать «у нас FSD» на вопрос про архитектуру проекта. Это раскладка файлов, а не решения.</li>
+    <li>Не хвалить FSD без единой претензии. Идеальных методологий не бывает, и интервьюер это знает.</li>
+    <li>Не оправдывать правила словами «так в документации». Называй эффект: что ломается без правила.</li>
+  </ul>
+</div>
+
+<h2>Шпаргалка</h2>
+
+<div class="cheat">
+  <ul>
+    <li><strong>FSD</strong> — методология, свод правил. Не библиотека, не структура папок, не гарантия качества.</li>
+    <li><strong>Три оси</strong>: слой (область влияния) · слайс (предметная область) · сегмент (техническое назначение).</li>
+    <li><strong>Шесть слоёв</strong> сверху вниз: <code>app · pages · widgets · features · entities · shared</code>.</li>
+    <li><strong>Мнемоника</strong>: от «что видит пользователь» к «из чего это сделано».</li>
+    <li><strong>Правило 1</strong>: импорты только вниз. Через слой вниз можно, вверх и вбок — нет.</li>
+    <li><strong>Правило 2</strong>: нет кросс-импортов между слайсами одного слоя.</li>
+    <li><strong>Правило 3</strong>: внутрь слайса — только через <code>index.ts</code>. <code>export *</code> не считается.</li>
+    <li><strong>Лечение похода наверх</strong> — параметризация: не идти за данными, а принять их аргументом.</li>
+    <li><strong>Лечение кросс-импорта</strong>: поднять сборку наверх · опустить общее в <code>entities</code> · слот или колбэк.</li>
+    <li><strong>Чем ниже слой, тем дороже нарушение.</strong> Самое опасное — домен в <code>shared</code>.</li>
+    <li><strong>Нарушение слоёв не ломает код сразу</strong> — оно ломает переиспользуемость, и это всплывает в проде.</li>
+    <li><strong>Претензии</strong>: свалка в shared · спор «фича или сущность» · бойлерплейт · кросс-импорты · оверхед на малых проектах.</li>
+    <li><strong>Что реально даёт</strong>: одинаковые имена · правило, проверяемое линтером · структура кричит о продукте.</li>
+  </ul>
+</div>
+
+<h2>Первоисточник</h2>
+
+<ul>
+  <li><strong>Официальная документация FSD</strong> —
+  <a href="https://feature-sliced.design/ru/docs/get-started/overview">feature-sliced.design</a>.
+  Есть на русском. Читать раздел Overview и Reference — на остальное времени не тратить.</li>
+  <li><strong>Урок 3 курса Паромова</strong> (<code>docs/paromov-lessons/3.md</code>) — разбор FSD
+  на живом приложении, с показом раскладки по сегментам.</li>
+</ul>
+
+<h2>Итог</h2>
+
+<div class="quizscore" data-quiz-score>Задания в уроке ещё не решены.</div>
+
+<div class="quiz" data-quiz="reveal" data-id="l4-final">
+  <div class="qhead">Последнее — вслух, своими словами</div>
+  <p class="qtext">Назови шесть слоёв по порядку и объясни, почему порядок именно такой.
+  Вслух, целиком, потом сверься.</p>
+  <div class="qanswer"><code>app · pages · widgets · features · entities · shared</code>.
+  Порядок — от «что видит пользователь» к «из чего это сделано», и одновременно
+  от изменчивого к устойчивому: <code>app</code> меняется по любому чиху, <code>shared</code> —
+  раз в полгода, зато на него завязаны все. Это принцип устойчивых зависимостей из урока 3:
+  зависеть можно только вниз, в сторону того, что меняется реже.</div>
+</div>
+
+<div class="note">
+  <div class="boxtitle">Дальше</div>
+  <p>Практика ниже: <code>04-fsd-layers</code> — три нарушения слоёв в маленьком приложении,
+  надо убрать все, не сломав поведение. Приём везде один — параметризация.</p>
+  <p>В уроке 5 разберём то, за что FSD ругают, вплотную: кросс-импорты, разрастание shared
+  и вопрос «фича или сущность» — с разбором конкретных тупиков и выходов из них.</p>
+</div>
