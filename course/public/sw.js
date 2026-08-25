@@ -9,6 +9,7 @@ const PAGES = `pages-${VERSION}`;
 const PRECACHE = [
   '/offline',
   '/static/style.css',
+  '/static/quiz.js',
   '/static/icon-192.png',
   '/static/icon-512.png',
   '/static/icon-maskable-512.png',

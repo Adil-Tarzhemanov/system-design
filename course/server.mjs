@@ -13,7 +13,7 @@ const db = openDb();
 // поменялся хоть один — установленное приложение сбрасывает старый кэш.
 const SHELL_VERSION = (() => {
   const h = createHash('sha1');
-  for (const f of ['style.css', 'sw.js', 'manifest.webmanifest']) h.update(readFileSync(join(PUBLIC, f)));
+  for (const f of ['style.css', 'quiz.js', 'sw.js', 'manifest.webmanifest']) h.update(readFileSync(join(PUBLIC, f)));
   const lessons = join(ROOT, 'course', 'lessons');
   for (const f of readdirSync(lessons).sort()) {
     h.update(f);
@@ -86,6 +86,7 @@ function layout(title, body, active = '') {
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="System Design">
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/quiz.js" defer></script>
 </head><body>
 <aside class="side">
   <div class="brand"><a href="/">Frontend<br><b>System Design</b></a></div>

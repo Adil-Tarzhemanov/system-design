@@ -250,3 +250,82 @@ h1 { font-size: 34px; line-height: 1.15; letter-spacing: -.02em; margin: 0 0 12p
   .main { padding: 28px 20px 70px; }
   h1 { font-size: 27px; }
 }
+
+/* ------------------------------------------------------ задания внутри урока */
+.termdef {
+  border-left: 3px solid var(--line); background: var(--panel);
+  padding: 11px 15px; border-radius: 0 var(--radius) var(--radius) 0;
+  margin: 0 0 18px; font-size: 15.5px; line-height: 1.6;
+}
+.termdef b { color: var(--accent); }
+.figcap { color: var(--dim); font-size: 13.5px; margin: -14px 0 26px; }
+
+.quiz {
+  background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: var(--radius); padding: 18px 20px; margin: 26px 0;
+}
+.quiz .qhead {
+  font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--accent); font-weight: 700; margin-bottom: 9px;
+}
+.quiz .qtext { margin: 0 0 14px; font-weight: 600; }
+.quiz pre { margin: 0 0 14px; }
+.qopts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.qopts li {
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 0;
+  cursor: pointer; font-size: 15.5px; line-height: 1.5; background: var(--bg);
+  transition: border-color .12s, background .12s;
+}
+.qopts li:hover { border-color: var(--accent); }
+.quiz.answered .qopts li { cursor: default; }
+.quiz.answered .qopts li:hover { border-color: var(--line); }
+.qopts li.ok { border-color: var(--ok); background: var(--ok-soft); }
+.qopts li.bad { border-color: var(--accent); background: var(--accent-soft); }
+.qopts li.picked { box-shadow: inset 3px 0 0 currentColor; }
+.qwhy { font-size: 14px; color: var(--dim); margin-top: 7px; line-height: 1.55; }
+.qverdict {
+  display: flex; align-items: center; gap: 14px; margin-top: 14px;
+  font-size: 14.5px; font-weight: 650; min-height: 1px;
+}
+.qverdict.good { color: var(--ok); }
+.qverdict.bad { color: var(--accent); }
+.qagain, .qshow {
+  font: inherit; font-weight: 500; font-size: 13.5px; cursor: pointer;
+  background: none; color: var(--dim); border: 1px solid var(--line);
+  border-radius: 99px; padding: 4px 13px;
+}
+.qagain:hover, .qshow:hover { color: var(--accent); border-color: var(--accent); }
+.qshow { margin-bottom: 4px; }
+.qanswer {
+  border-left: 3px solid var(--ok); background: var(--ok-soft);
+  padding: 11px 15px; border-radius: 0 8px 8px 0; font-size: 15.5px; line-height: 1.6;
+}
+.qafter { font-size: 15px; line-height: 1.6; color: var(--dim); margin-top: 14px; }
+
+.mgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 10px; }
+.mcol { display: grid; gap: 8px; align-content: start; }
+.mitem {
+  font: inherit; font-size: 14.5px; line-height: 1.45; text-align: left; cursor: pointer;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 13px; transition: border-color .12s, background .12s;
+}
+.mitem:hover { border-color: var(--accent); }
+.mitem.mterm { font-weight: 600; }
+.mitem.sel { border-color: var(--accent); background: var(--accent-soft); }
+.mitem.done { border-color: var(--ok); background: var(--ok-soft); cursor: default; opacity: .75; }
+.mitem.shake { border-color: var(--accent); animation: shake .4s; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.quizscore {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 13px 17px; font-size: 14.5px; color: var(--dim); margin: 26px 0;
+}
+
+@media (max-width: 700px) {
+  .mgrid { grid-template-columns: 1fr; }
+  .mcol + .mcol { margin-top: 4px; }
+}

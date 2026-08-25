@@ -1,228 +1,259 @@
-<p class="lead" style="margin-bottom:32px">
-Второй урок — про то, как модуль перестаёт зависеть от того, кого он вызывает.
-Тема выглядит академической («SOLID, интерфейсы, DI-контейнеры»), но именно она
-объясняет, почему в FSD работают слоты, почему <code>onClick</code> — это архитектурный приём,
-и почему на вопрос «в чём разница между dependency inversion и dependency injection»
-сыплется большинство кандидатов.
+<p class="lead" style="margin-bottom:28px">
+Этот урок — про одну идею: <strong>как сделать так, чтобы твой код не ломался,
+когда меняется чужой</strong>. У идеи есть пугающее имя «инверсия зависимостей»,
+несколько похожих терминов, которые все путают, и буква D в аббревиатуре SOLID.
+Разберём по шагам, без единого слова без объяснения.
 </p>
 
 <div class="interview">
   <div class="boxtitle">Зачем это на собесе</div>
   <p>Два вопроса встречаются почти дословно: <em>«расскажи про SOLID»</em> и
-  <em>«чем инверсия зависимостей отличается от внедрения»</em>. На первом ждут не пересказ пяти букв,
-  а то, что ты отличишь применимое от карго-культа. На втором отсеивают тех, кто выучил
-  определения, но не может показать инверсию в обычном React-компоненте. К концу урока
-  ты сможешь и то, и другое — и увидишь, что делал инверсию каждый день, не зная названия.</p>
+  <em>«чем инверсия зависимостей отличается от внедрения»</em>. Второй — фильтр:
+  на нём видно, кто выучил определения, а кто понимает, что происходит в коде.
+  К концу урока ты сможешь ответить на оба и увидишь, что делал инверсию
+  каждый день, просто не знал названия.</p>
 </div>
 
-<h2>1. SOLID: почему его нельзя переносить дословно</h2>
+<div class="quizscore" data-quiz-score>По ходу урока будут задания.</div>
 
-<p>SOLID сформулирован Робертом Мартином на рубеже 2000-х для языков с классами,
-наследованием и явными интерфейсами — Java, C#. Во фронтенде на React у нас функции,
-композиция и структурная типизация. Дословный перенос даёт карго-культ:
-абстрактные фабрики там, где хватило бы функции, и «интерфейс на каждый чих».</p>
+<h2>Словарь урока</h2>
 
-<p>Но выкидывать SOLID тоже нельзя: три принципа из пяти во фронте работают отлично,
-если читать их не как правила про классы, а как правила про <strong>границы модулей</strong> —
-то есть ровно про то, о чём был <a href="/lesson/1">первый урок</a>.</p>
-
-<div class="warnbox">
-  <div class="boxtitle">Как звучит плохой ответ</div>
-  <p>«S — single responsibility, класс должен делать одну вещь. O — open-closed, открыт для
-  расширения, закрыт для изменения. L — Лисков…» — заученный список без единого примера
-  из своего кода. Интервьюер слышит это по десять раз в неделю и ставит галочку «читал статью».</p>
-</div>
-
-<h2>2. Три принципа, которые работают во фронте</h2>
-
-<h3>SRP — одна причина для изменения</h3>
-
-<p>Формулировка «модуль должен делать одну вещь» бесполезна: «одна вещь» — понятие резиновое.
-Рабочая формулировка Мартина другая:</p>
-
-<blockquote>
-У модуля должна быть ровно одна причина для изменения — то есть ровно один заказчик,
-чьи требования этот модуль обслуживает.
-</blockquote>
-
-<p>Критерий не «сколько делает», а <strong>сколько разных людей могут прийти с правкой</strong>.</p>
-
-<pre><code>// features/order-card — сколько заказчиков у этого файла?
-function OrderCard({ order }) {
-  const money = new Intl.NumberFormat('kk-KZ', { ... }).format(order.total); // финансы
-  const canRefund = user.roles.includes('admin') || order.age &lt; 14;          // безопасность
-  const { data } = useQuery(['order', order.id], () =&gt; api.get(...));        // бэкенд
-  return ...;                                                                // дизайн
-}</code></pre>
-
-<p>Четыре независимых источника требований в одном файле. Смена формата денег, смена правил
-возврата, смена контракта API и редизайн — четыре разные команды будут править один и тот же файл
-и мешать друг другу. Это ровно та самая низкая cohesion из первого урока, только
-названная со стороны организации, а не со стороны кода.</p>
-
-<h3>OCP — расширяем, не изменяя</h3>
-
-<p>В ООП это про наследование. В React — про <strong>слоты и пропсы</strong>.</p>
-
-<pre><code>// ❌ каждый новый случай = правка самого Modal
-&lt;Modal mode="edit" | "view" | "compact" | "danger" /&gt;
-
-// ✅ Modal не меняется никогда, меняется то, что в него кладут
-&lt;Modal header={&lt;EditTitle /&gt;} footer={&lt;SaveButton /&gt;}&gt;{form}&lt;/Modal&gt;</code></pre>
-
-<p>Первый вариант — это ещё и <strong>control coupling</strong> из таблицы первого урока:
-снаружи флагом управляют ветвлением внутри. Второй — data coupling: наружу отдан контракт,
-а не рычаг.</p>
-
-<h3>DIP — зависеть от абстракции, а не от реализации</h3>
-
-<p>Самый ценный из пяти и самый недопонятый. Ему посвящён весь остаток урока.</p>
-
-<h3>А что с L и I</h3>
-
-<p>Их спрашивают редко, но иметь по одной честной фразе на каждый стоит.</p>
+<p>Все слова, которые дальше встретятся. Пока просто прочитай — каждое разберём
+на примерах, сюда можно возвращаться.</p>
 
 <table>
-  <tr><th>Принцип</th><th>Что говорить</th></tr>
-  <tr><td>LSP (Лисков)</td><td>Без наследования во фронте почти не встречается. Живёт как правило
-  «не ломай контракт при расширении»: если <code>&lt;IconButton&gt;</code> обёртка над <code>&lt;Button&gt;</code>,
-  она обязана принимать всё, что принимал <code>Button</code>, и вести себя так же.</td></tr>
-  <tr><td>ISP (разделение интерфейсов)</td><td>Не заставляй потребителя знать о том, чем он не пользуется.
-  Во фронте это толстые пропсы (<code>user</code> целиком там, где нужен <code>userId</code>)
-  и толстые контексты, из-за которых компонент ререндерится на чужие изменения.</td></tr>
+  <tr><th>Слово</th><th>Что значит</th></tr>
+  <tr><td><strong>Модуль</strong></td><td>Любой отдельный кусок кода со своим входом: файл, папка, пакет. Из первого урока.</td></tr>
+  <tr><td><strong>Зависимость</strong></td><td>Чужой код, без которого мой не заработает. Обычно видна как <code>import</code>.</td></tr>
+  <tr><td><strong>Реализация</strong></td><td>Настоящий рабочий код, который что-то делает: ходит в сеть, пишет в базу.</td></tr>
+  <tr><td><strong>Абстракция</strong></td><td>Описание того, <em>что</em> нужно, без ответа <em>как</em> это сделано.</td></tr>
+  <tr><td><strong>Контракт</strong></td><td>Абстракция, записанная явно: список функций, их аргументы и что они возвращают. В TypeScript — это <code>type</code>.</td></tr>
+  <tr><td><strong>Фабрика</strong></td><td>Функция, которая не работает сама, а <em>создаёт</em> и возвращает готовый к работе объект или набор функций.</td></tr>
+  <tr><td><strong>Адаптер</strong></td><td>Тонкая прослойка, которая переделывает чужой формат под нужный. Часто одна стрелочная функция.</td></tr>
+  <tr><td><strong>Фасад</strong></td><td>Обёртка, прячущая сложность чего-то большого за простым набором функций.</td></tr>
+  <tr><td><strong>Композиционный корень</strong></td><td>Единственное место в приложении, где всё собирается вместе. Обычно <code>app/</code> или <code>main.tsx</code>.</td></tr>
 </table>
 
-<h2>3. Три термина, которые все путают</h2>
+<h2>1. Зависимость: с чего вообще проблема</h2>
 
-<p>Это ядро урока. Разложи их один раз — и вопрос на собесе перестанет быть страшным.</p>
-
-<table>
-  <tr><th>Термин</th><th>Что это</th><th>Пример</th></tr>
-  <tr><td><strong>DIP</strong><br>Dependency Inversion Principle</td>
-      <td><em>Принцип</em> из SOLID: модули верхнего уровня не должны зависеть от нижних,
-      оба зависят от абстракций.</td>
-      <td>Пункт в чеклисте ревью</td></tr>
-  <tr><td><strong>Dependency Inversion</strong><br>инверсия зависимости</td>
-      <td><em>Приём</em>: развернуть стрелку зависимости в обратную сторону относительно вызова.</td>
-      <td>Модуль объявляет нужный ему тип, реализация подстраивается</td></tr>
-  <tr><td><strong>Dependency Injection</strong><br>внедрение зависимости</td>
-      <td><em>Механизм доставки</em>: как конкретная реализация попадает внутрь.</td>
-      <td>Аргумент функции, проп, React Context, DI-контейнер в Angular/NestJS</td></tr>
-</table>
-
-<div class="note">
-  <div class="boxtitle">Формулировка, которую стоит запомнить дословно</div>
-  <p>«Инверсия зависимости — это когда <strong>поток управления не совпадает с потоком
-  зависимостей</strong>. Инъекция — это просто способ доставить реализацию внутрь.
-  Инверсия отвечает на вопрос <em>кто кого знает</em>, инъекция — на вопрос <em>как передали</em>.»</p>
+<div class="termdef">
+  <b>Зависимость</b> — чужой код, без которого мой не работает.
+  Если я написал <code>import</code>, я стал зависимым: чужие изменения теперь мои проблемы.
 </div>
 
-<ul>
-  <li><strong>Поток управления</strong> (control flow) — кто кого вызывает.</li>
-  <li><strong>Поток зависимостей</strong> (dependency flow) — кто кого импортирует, чей тип знает.</li>
-</ul>
+<pre><code>// features/checkout/model.ts — мой модуль
+import { stripe } from '@/shared/api/stripe';   // ← вот она, зависимость
 
-<p>По умолчанию они совпадают: чтобы вызвать — надо импортировать. Инверсия — это когда
-их развели: вызов идёт вперёд, а знание — назад.</p>
-
-<svg viewBox="0 0 640 270" role="img" aria-label="Схема: до инверсии обе стрелки идут в одну сторону, после инверсии зависимость разворачивается навстречу вызову" style="margin:8px 0 26px">
-  <g fill="currentColor" font-size="12" font-family="system-ui" opacity="0.75">
-    <text x="16" y="18">без инверсии — обе стрелки в одну сторону</text>
-    <text x="16" y="158">с инверсией — стрелки разъехались</text>
-  </g>
-  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
-    <rect x="16" y="34" width="180" height="52" rx="10"/>
-    <rect x="424" y="34" width="200" height="52" rx="10"/>
-    <rect x="16" y="174" width="180" height="66" rx="10"/>
-    <rect x="424" y="174" width="200" height="66" rx="10"/>
-  </g>
-  <g fill="currentColor" font-size="13" font-family="system-ui">
-    <text x="34" y="58">checkout</text>
-    <text x="34" y="76" font-size="11" opacity="0.6">важный модуль</text>
-    <text x="442" y="58">stripe / apiClient</text>
-    <text x="442" y="76" font-size="11" opacity="0.6">чужая изменчивость</text>
-    <text x="34" y="198">checkout</text>
-    <text x="34" y="216" font-size="11" opacity="0.6">объявляет тип</text>
-    <text x="34" y="232" font-size="11" opacity="0.6">PaymentGateway</text>
-    <text x="442" y="198">адаптер над stripe</text>
-    <text x="442" y="216" font-size="11" opacity="0.6">подходит под чужой тип</text>
-    <text x="442" y="232" font-size="11" opacity="0.6">по структуре</text>
-  </g>
-  <g stroke="currentColor" fill="none" stroke-width="1.4" opacity="0.75">
-    <path d="M196 50 L418 50" marker-end="url(#ar2)"/>
-    <path d="M196 76 L418 76" stroke-dasharray="4 4" marker-end="url(#ar2)"/>
-    <path d="M418 196 L202 196" marker-end="url(#ar2)"/>
-    <path d="M196 228 L418 228" stroke-dasharray="4 4" marker-end="url(#ar2)"/>
-  </g>
-  <g fill="currentColor" font-size="11" font-family="system-ui" opacity="0.7">
-    <text x="222" y="44">import — зависимость</text>
-    <text x="222" y="70">вызов — управление</text>
-    <text x="228" y="190">знает тип — зависимость</text>
-    <text x="222" y="222">вызов — управление</text>
-  </g>
-  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
-</svg>
-
-<div class="warnbox">
-  <div class="boxtitle">Инъекция без инверсии — возможна и бесполезна</div>
-  <p>Это главная ловушка вопроса. Смотри:</p>
-  <pre><code>import type { TelegramClient } from '@/shared/telegram';
-
-export function notify(client: TelegramClient, text: string) { ... }</code></pre>
-  <p>Зависимость «внедрена» — её передали аргументом. Но тип пришёл <em>из чужого модуля</em>.
-  Стрелка не развернулась, она просто переехала из <code>import</code> в сигнатуру:
-  поменяется телеграм — поменяется и этот файл. <strong>Injection есть, inversion нет.</strong></p>
-</div>
-
-<h2>4. Фасад — это ещё не инверсия</h2>
-
-<p>Самое частое возражение: «у нас всё завёрнуто в сервисы, у нас уже абстракция».
-Разберём, почему этого мало.</p>
-
-<pre><code>userStore  →  userApi  →  httpClient
-           (фасад)</code></pre>
-
-<p><code>userStore</code> действительно не знает про <code>httpClient</code> напрямую — и это лучше,
-чем ничего: фасад скрывает изменчивость и даёт место для адаптации. Но:</p>
-
-<ul>
-  <li>зависимость осталась, просто стала <strong>транзитивной</strong> — изменение всё равно
-  просачивается вверх по цепочке;</li>
-  <li>подменить реализацию можно только <strong>статически</strong>, переписав <code>userApi</code>;</li>
-  <li><code>userStore</code> нельзя физически вынуть из проекта и переиспользовать — он тянет
-  за собой весь хвост.</li>
-</ul>
-
-<div class="note">
-  <div class="boxtitle">Детектор инверсии: кто владеет типом</div>
-  <p>Один вопрос, который отвечает на всё: <strong>где объявлен тип зависимости?</strong></p>
-  <ul>
-    <li>Тип объявлен <em>в модуле-потребителе</em>, реализация подставляется снаружи — <strong>инверсия есть</strong>.</li>
-    <li>Тип импортирован <em>из модуля-реализации</em> — инверсии нет, как бы красиво ни назывался слой.</li>
-  </ul>
-</div>
-
-<h2>5. Инверсия в TypeScript — без классов и без <code>implements</code></h2>
-
-<p>В книжках инверсию показывают на интерфейсах и <code>implements</code>. В TS это чаще всего
-лишний ритуал: благодаря <strong>структурной типизации</strong> ничего не нужно явно
-имплементировать — достаточно совпадения по форме.</p>
-
-<p>Было — checkout прибит к платёжному провайдеру:</p>
-
-<pre><code>// ❌ features/checkout/model.ts
-import { stripe } from '@/shared/api/stripe';
-
-export async function pay(orderId: string, amount: number) {
+export async function pay(orderId, amount) {
   const res = await stripe.charge({ order: orderId, sum: amount, cur: 'KZT' });
   return res.ok;
 }</code></pre>
 
-<p>Стало — checkout объявляет, что ему нужно, и больше ни о чём не знает:</p>
+<svg viewBox="0 0 640 120" role="img" aria-label="Модуль checkout импортирует модуль stripe: одна стрелка слева направо" style="margin:6px 0 10px">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="30" y="44" width="200" height="58" rx="10"/>
+    <rect x="410" y="44" width="200" height="58" rx="10"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui">
+    <text x="50" y="70" font-size="14">checkout</text>
+    <text x="50" y="89" font-size="11.5" opacity="0.6">мой код, важный</text>
+    <text x="430" y="70" font-size="14">stripe</text>
+    <text x="430" y="89" font-size="11.5" opacity="0.6">чужой код, меняется</text>
+    <text x="252" y="34" font-size="12" opacity="0.75">import — я знаю про него</text>
+    <text x="266" y="92" font-size="12" opacity="0.75">вызов — я его использую</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.5" opacity="0.8">
+    <path d="M230 65 L404 65" marker-end="url(#a1)"/>
+    <path d="M230 82 L404 82" stroke-dasharray="4 4" marker-end="url(#a1)"/>
+  </g>
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+<p class="figcap">Обычная ситуация: обе стрелки идут в одну сторону. Я и знаю про stripe, и вызываю его.</p>
 
-<pre><code>// ✅ features/checkout/model.ts — ноль импортов из чужих модулей
+<p>Что с этим не так — три конкретные вещи:</p>
+
+<ul>
+  <li><strong>Stripe поменяет формат</strong> — переименует <code>sum</code> в <code>amount</code> —
+  и мне придётся править свой файл, хотя моя логика оплаты не изменилась ни на грамм.</li>
+  <li><strong>Продукт скажет «добавляем Kaspi Pay»</strong> — придётся лезть внутрь checkout
+  и городить там <code>if</code>.</li>
+  <li><strong>Тест</strong> этой функции реально пойдёт в сеть. Чтобы не пошёл, нужны моки —
+  подмена модуля на лету, отдельная библиотека, отдельная боль.</li>
+</ul>
+
+<div class="quiz" data-quiz="reveal" data-id="l2-dep">
+  <div class="qhead">Вспомни, не подглядывая</div>
+  <p class="qtext">Своими словами: что такое зависимость и по какому признаку её видно в файле?</p>
+  <div class="qanswer">Зависимость — чужой код, без которого мой не работает.
+  В файле её видно по <code>import</code>: если я импортирую модуль, я знаю о его существовании
+  и завишу от его формы.</div>
+</div>
+
+<h2>2. Контракт — главное слово урока</h2>
+
+<div class="termdef">
+  <b>Контракт</b> — описание <em>формы</em> зависимости, без её содержимого.
+  «Мне нужна функция, которая принимает вот такой объект и возвращает вот такой».
+  Кто именно её выполнит — не моё дело.
+</div>
+
+<p>Житейская аналогия: <strong>розетка</strong>. Розетка не знает, что́ ты в неё воткнёшь —
+чайник, ноутбук или зарядку. Она задаёт только форму: два отверстия, 220 вольт.
+Всё, что подходит по форме, работает. Розетка не зависит от чайника —
+это <em>чайник</em> обязан подойти под розетку.</p>
+
+<svg viewBox="0 0 640 210" role="img" aria-label="Модуль объявляет контракт, две реализации примеряются к нему: одна подходит, другая нет" style="margin:6px 0 10px">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="14" y="72" width="150" height="66" rx="10"/>
+    <rect x="240" y="72" width="150" height="66" rx="10" stroke-dasharray="5 4"/>
+    <rect x="466" y="30" width="160" height="56" rx="10"/>
+    <rect x="466" y="124" width="160" height="56" rx="10" opacity="0.45"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui">
+    <text x="32" y="100" font-size="13.5">checkout</text>
+    <text x="32" y="119" font-size="11.5" opacity="0.6">мой важный модуль</text>
+    <text x="258" y="98" font-size="13" >контракт</text>
+    <text x="258" y="117" font-size="11" opacity="0.6">charge({ orderId, amount })</text>
+    <text x="484" y="54" font-size="13">адаптер к stripe</text>
+    <text x="484" y="72" font-size="11" opacity="0.6">подходит по форме</text>
+    <text x="484" y="148" font-size="13" opacity="0.7">почтовый клиент</text>
+    <text x="484" y="166" font-size="11" opacity="0.5">формы не совпали</text>
+    <text x="176" y="60" font-size="11.5" opacity="0.7">объявляет</text>
+    <text x="400" y="24" font-size="11.5" opacity="0.7">подстраивается</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.5" opacity="0.8">
+    <path d="M164 105 L234 105" marker-end="url(#a2)"/>
+    <path d="M466 58 L396 96" marker-end="url(#a2)"/>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.4" opacity="0.35" stroke-dasharray="4 4">
+    <path d="M466 152 L396 118"/>
+  </g>
+  <g stroke="currentColor" stroke-width="1.6" opacity="0.5">
+    <path d="M424 138 L436 150 M436 138 L424 150"/>
+  </g>
+  <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+<p class="figcap">Контракт объявляет тот, кому нужна помощь. Подстраиваются — те, кто её оказывает.</p>
+
+<p>В TypeScript контракт пишется одной строкой — это обычный <code>type</code>:</p>
+
+<pre><code>// «мне нужен кто-то, кто умеет списывать деньги вот так»
 export type PaymentGateway = {
+  charge(input: { orderId: string; amount: number }): Promise&lt;{ ok: boolean }&gt;;
+};</code></pre>
+
+<p>Здесь нет ни строчки рабочего кода — ни запроса, ни ключей, ни обработки ошибок.
+Только форма. Это и есть <strong>абстракция</strong>: сказано <em>что</em>, не сказано <em>как</em>.</p>
+
+<div class="quiz" data-quiz="choice" data-id="l2-contract">
+  <div class="qhead">Задание 1</div>
+  <p class="qtext">Что из этого — контракт, а не реализация?</p>
+  <ul class="qopts">
+    <li data-ok data-why="Верно: описана только форма — какие аргументы и что вернётся. Никакой работы здесь не происходит.">
+      <code>type Storage = { get(k: string): string | null }</code>
+    </li>
+    <li data-why="Это реализация: код реально лезет в localStorage и что-то оттуда достаёт.">
+      <code>const storage = { get: (k) =&gt; localStorage.getItem(k) }</code>
+    </li>
+    <li data-why="Это тоже реализация, просто короткая — внутри настоящий вызов сети.">
+      <code>const get = (k) =&gt; fetch('/api/' + k).then(r =&gt; r.json())</code>
+    </li>
+  </ul>
+</div>
+
+<h2>3. Две стрелки: кто вызывает и кто знает</h2>
+
+<p>Дальше всё держится на одном различении. Между двумя модулями всегда есть
+<strong>две разные стрелки</strong>, и их обычно не замечают, потому что они совпадают.</p>
+
+<div class="termdef">
+  <b>Поток управления</b> (control flow) — <em>кто кого вызывает</em>.
+  Кто первый начал работу, кому передал.
+</div>
+
+<div class="termdef">
+  <b>Поток зависимостей</b> (dependency flow) — <em>кто про кого знает</em>.
+  Кто кого импортирует, чьё имя и чью форму упоминает у себя в коде.
+</div>
+
+<p>По умолчанию они смотрят в одну сторону: чтобы кого-то вызвать, надо его импортировать.
+Именно так было в примере из первого раздела. И вот вопрос, ради которого весь урок:
+<strong>а обязательно ли они должны совпадать?</strong></p>
+
+<div class="quiz" data-quiz="choice" data-id="l2-arrows">
+  <div class="qhead">Задание 2</div>
+  <p class="qtext">Кнопка вызывает переданный ей <code>onClick</code>. Куда смотрят стрелки?</p>
+  <pre><code>function DeleteButton({ onClick }) {
+  return &lt;button onClick={onClick}&gt;Удалить&lt;/button&gt;;
+}</code></pre>
+  <ul class="qopts">
+    <li data-ok data-why="Именно так. Кнопка запускает чужой код (управление идёт от неё), но не импортирует его и ничего о нём не знает.">
+      Управление — от кнопки наружу, зависимости от кнопки наружу нет
+    </li>
+    <li data-why="Нет: кнопка нигде не импортирует обработчик, она получает его пропом и не знает, что он делает.">
+      Обе стрелки от кнопки к обработчику, как обычно
+    </li>
+    <li data-why="Нет: кнопка именно что вызывает обработчик, управление идёт от неё.">
+      Кнопка ничего не вызывает, она только рисует разметку
+    </li>
+  </ul>
+  <div class="qafter">Ты только что опознал инверсию зависимости в четырёх строчках обычного React.
+  Дальше просто дадим этому имя.</div>
+</div>
+
+<h2>4. Инверсия — развернуть стрелку знания</h2>
+
+<div class="termdef">
+  <b>Инверсия зависимости</b> — ситуация, когда <em>поток управления не совпадает
+  с потоком зависимостей</em>. Вызов идёт вперёд, а знание — назад.
+</div>
+
+<svg viewBox="0 0 640 280" role="img" aria-label="Сверху: обе стрелки идут вправо. Снизу: стрелка зависимости развернулась влево, а вызов остался вправо" style="margin:6px 0 10px">
+  <g fill="currentColor" font-family="system-ui" font-size="12" opacity="0.75">
+    <text x="14" y="16">было — обе стрелки в одну сторону</text>
+    <text x="14" y="162">стало — стрелки разъехались</text>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="14" y="32" width="190" height="56" rx="10"/>
+    <rect x="430" y="32" width="196" height="56" rx="10"/>
+    <rect x="14" y="178" width="190" height="72" rx="10"/>
+    <rect x="430" y="178" width="196" height="72" rx="10"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui">
+    <text x="32" y="58" font-size="13.5">checkout</text>
+    <text x="32" y="77" font-size="11.5" opacity="0.6">import stripe</text>
+    <text x="448" y="58" font-size="13.5">stripe</text>
+    <text x="448" y="77" font-size="11.5" opacity="0.6">ничего не знает</text>
+    <text x="32" y="204" font-size="13.5">checkout</text>
+    <text x="32" y="222" font-size="11.5" opacity="0.6">объявляет контракт</text>
+    <text x="32" y="239" font-size="11.5" opacity="0.6">PaymentGateway</text>
+    <text x="448" y="204" font-size="13.5">адаптер к stripe</text>
+    <text x="448" y="222" font-size="11.5" opacity="0.6">знает контракт</text>
+    <text x="448" y="239" font-size="11.5" opacity="0.6">и подстраивается</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.5" opacity="0.8">
+    <path d="M204 50 L424 50" marker-end="url(#a3)"/>
+    <path d="M204 74 L424 74" stroke-dasharray="4 4" marker-end="url(#a3)"/>
+    <path d="M424 198 L210 198" marker-end="url(#a3)"/>
+    <path d="M204 236 L424 236" stroke-dasharray="4 4" marker-end="url(#a3)"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="11.5" opacity="0.7">
+    <text x="228" y="44">знание</text>
+    <text x="228" y="68">вызов</text>
+    <text x="240" y="192">знание — теперь в другую сторону</text>
+    <text x="240" y="230">вызов — по-прежнему вперёд</text>
+  </g>
+  <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+<p class="figcap">Работу по-прежнему делает stripe. Но теперь про контракт знает он, а не наоборот.</p>
+
+<p>В коде это три файла. Первый — мой модуль, у него больше нет ни одного импорта:</p>
+
+<pre><code>// features/checkout/model.ts
+export type PaymentGateway = {                       // контракт: что мне нужно
   charge(input: { orderId: string; amount: number }): Promise&lt;{ ok: boolean }&gt;;
 };
 
@@ -232,157 +263,485 @@ export function createCheckout({ gateway }: { gateway: PaymentGateway }) {
   };
 }</code></pre>
 
+<div class="termdef">
+  <b>Фабрика</b> — функция, которая сама работу не делает, а собирает и возвращает того,
+  кто будет делать. <code>createCheckout</code> — фабрика: ей дают зависимость,
+  она отдаёт готовый checkout.
+</div>
+
+<p>Второй файл — <code>stripe</code>, он вообще не меняется, он про нас не знает.
+Третий — место сборки:</p>
+
 <pre><code>// app/composition.ts — единственное место, где живёт конкретика
 import { createCheckout } from '@/features/checkout';
 import { stripe } from '@/shared/api/stripe';
 
 export const checkout = createCheckout({
-  gateway: {                                    // ← это и есть адаптер, целиком
+  gateway: {                                          // ← адаптер, целиком
     charge: ({ orderId, amount }) =&gt;
       stripe.charge({ order: orderId, sum: amount, cur: 'KZT' }),
   },
 });</code></pre>
 
-<p>Ни одного <code>class</code>, ни одного <code>implements</code>. Адаптер — стрелочная функция,
-переименовывающая пару полей. Проверка совместимости произошла в момент подстановки:
-подошло по структуре — компилируется, не подошло — красное.</p>
-
-<div class="interview">
-  <div class="boxtitle">Побочный эффект, который стоит назвать вслух</div>
-  <p>Тесты. <code>createCheckout({ gateway: fakeGateway })</code> — юнит-тест без единого мока,
-  без <code>jest.mock</code>, без перехвата сети. Если на собесе спрашивают «как вы тестируете
-  бизнес-логику», ответ «она не знает, откуда приходят данные, поэтому мокать нечего»
-  сильнее любого рассказа про MSW.</p>
+<div class="termdef">
+  <b>Адаптер</b> — прослойка, переводящая один формат в другой.
+  Здесь это одна стрелочная функция: снаружи она выглядит как <code>charge</code> из контракта,
+  внутри зовёт stripe с его собственными именами полей.
 </div>
+
+<p>Обрати внимание: нигде нет ни <code>class</code>, ни слова <code>implements</code>.
+TypeScript сверяет по форме — если объект похож на <code>PaymentGateway</code>, значит, он им и является.
+Это называется <strong>структурная типизация</strong>, и благодаря ей инверсия во фронте
+почти не требует лишнего кода.</p>
 
 <div class="note">
-  <div class="boxtitle">Мелочь про <code>type</code> vs <code>interface</code></div>
-  <p>Ключевое слово <code>interface</code> имеет смысл, когда есть класс с <code>implements</code>.
-  Если классов нет — пиши <code>type</code>. Это передаёт намерение: <code>type</code> описывает форму,
-  <code>interface</code> — контракт, который кто-то обязан реализовать.</p>
+  <div class="boxtitle">Детектор: один вопрос на всё</div>
+  <p><strong>Где объявлен тип зависимости?</strong></p>
+  <ul>
+    <li>У того, <em>кто её использует</em> — <strong>инверсия есть</strong>.</li>
+    <li>У того, <em>кто её реализует</em> — инверсии нет, как бы красиво ни назывались слои.</li>
+  </ul>
 </div>
 
-<h2>6. Инверсия в React, которой ты пользуешься каждый день</h2>
+<div class="quiz" data-quiz="choice" data-id="l2-detector">
+  <div class="qhead">Задание 3 — главное в уроке</div>
+  <p class="qtext">Инверсия здесь есть?</p>
+  <pre><code>import { stripe } from '@/shared/api/stripe';
 
-<p>А теперь неожиданное: половину приёмов из этого урока ты применяешь ежедневно,
-просто они не назывались этим словом.</p>
+export function pay(orderId, amount) {
+  return stripe.charge({ order: orderId, sum: amount, cur: 'KZT' });
+}</code></pre>
+  <ul class="qopts">
+    <li data-why="Нет. Модуль импортирует stripe напрямую — он и вызывает его, и знает о нём. Обе стрелки в одну сторону.">
+      Да, ведь модуль вызывает чужой код
+    </li>
+    <li data-ok data-why="Верно. Есть import — значит, модуль знает про stripe. Знание и вызов идут в одну сторону, разворота не произошло.">
+      Нет, модуль знает про stripe напрямую
+    </li>
+    <li data-why="Здесь нет даже инъекции: зависимость не передают снаружи, её берут импортом.">
+      Инъекция есть, а инверсии нет
+    </li>
+  </ul>
+</div>
 
-<table>
-  <tr><th>Приём</th><th>Кто кого вызывает</th><th>Кто от кого зависит</th></tr>
-  <tr><td><code>onClick</code> и любой колбэк-проп</td><td>кнопка вызывает обработчик</td><td>кнопка не знает о нём ничего</td></tr>
-  <tr><td>Слот: <code>children</code> или проп типа <code>ReactNode</code></td><td>карточка рендерит кнопку удаления</td><td>карточка не импортирует кнопку</td></tr>
-  <tr><td>Render prop</td><td>список рендерит элемент</td><td>список не знает тип элемента</td></tr>
-  <tr><td>Context</td><td>хук вызывает реализацию</td><td>хук знает только тип контекста</td></tr>
-</table>
+<h2>5. Три похожих термина</h2>
 
-<pre><code>// ❌ TaskCard знает про кнопку, кнопка знает про стор, стор знает про API
+<p>Вот здесь и сыплются на собеседовании: три названия, которые звучат почти одинаково,
+но находятся на разных этажах.</p>
+
+<svg viewBox="0 0 640 230" role="img" aria-label="Три этажа: принцип DIP сверху, приём инверсия в середине, механизм инъекция снизу" style="margin:6px 0 10px">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="86" y="16" width="540" height="58" rx="10"/>
+    <rect x="86" y="88" width="540" height="58" rx="10"/>
+    <rect x="86" y="160" width="540" height="58" rx="10"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui">
+    <text x="106" y="42" font-size="13.5">DIP — принцип</text>
+    <text x="106" y="61" font-size="11.5" opacity="0.62">буква D в SOLID. Отвечает на «зачем»: зависеть надо от абстракций</text>
+    <text x="106" y="114" font-size="13.5">Dependency Inversion — приём</text>
+    <text x="106" y="133" font-size="11.5" opacity="0.62">отвечает на «что делаем»: разворачиваем стрелку знания</text>
+    <text x="106" y="186" font-size="13.5">Dependency Injection — механизм</text>
+    <text x="106" y="205" font-size="11.5" opacity="0.62">отвечает на «как передаём»: аргумент, проп, контекст, контейнер</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.4" opacity="0.6">
+    <path d="M46 24 L46 210" marker-end="url(#a4)"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="11" opacity="0.6">
+    <text x="14" y="100" transform="rotate(-90 14 100)">от идеи к коду</text>
+  </g>
+  <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+<p class="figcap">Инверсия отвечает на вопрос «кто кого знает». Инъекция — на вопрос «как передали».</p>
+
+<div class="quiz" data-quiz="match" data-id="l2-terms">
+  <div class="qhead">Задание 4 — соедини пары</div>
+  <p class="qtext">Нажми термин слева, потом его описание справа.</p>
+  <ul class="qpairs">
+    <li data-term="DIP">Принцип: зависеть надо от абстракций, а не от реализаций</li>
+    <li data-term="Инверсия">Приём: стрелка знания смотрит против стрелки вызова</li>
+    <li data-term="Инъекция">Механизм: зависимость передали снаружи, а не взяли импортом</li>
+    <li data-term="Контракт">Описание формы зависимости, записанное типом</li>
+    <li data-term="Адаптер">Прослойка, переводящая чужой формат в нужный</li>
+  </ul>
+</div>
+
+<h2>6. Ловушка: инъекция без инверсии</h2>
+
+<p>Это самый частый способ выглядеть архитектурно и не получить ничего.</p>
+
+<div class="quiz" data-quiz="choice" data-id="l2-trap">
+  <div class="qhead">Задание 5</div>
+  <p class="qtext">Зависимость передали аргументом. Инверсия произошла?</p>
+  <pre><code>import type { TelegramClient } from '@/shared/telegram';
+
+export function notify(client: TelegramClient, text: string) {
+  return client.send(text);
+}</code></pre>
+  <ul class="qopts">
+    <li data-why="Передача аргументом — это инъекция. Но тип TelegramClient импортирован из чужого модуля, значит, знание всё ещё идёт в ту же сторону.">
+      Да, зависимость же передаётся снаружи
+    </li>
+    <li data-ok data-why="Верно. Тип пришёл из модуля-реализации: import никуда не делся, он просто переехал в сигнатуру. Injection есть, inversion нет.">
+      Нет, тип объявлен на стороне телеграма
+    </li>
+    <li data-why="Инъекция как раз есть — зависимость приходит аргументом, а не импортом значения.">
+      Нет, потому что нет и инъекции
+    </li>
+  </ul>
+  <div class="qafter">Чтобы починить, достаточно объявить свой тип у себя:
+  <code>type Sender = { send(text: string): Promise&lt;void&gt; }</code> — и телеграм подстроится под него.</div>
+</div>
+
+<h2>7. Фасад — это ещё не инверсия</h2>
+
+<div class="termdef">
+  <b>Фасад</b> — обёртка, которая прячет сложность чего-то большого за простым набором функций.
+  Полезная штука, но к инверсии отношения не имеет.
+</div>
+
+<p>Самое частое возражение звучит так: «у нас всё завёрнуто в сервисы, у нас уже абстракция».
+Смотри, что на самом деле происходит:</p>
+
+<svg viewBox="0 0 640 250" role="img" aria-label="Сверху цепочка из трёх модулей, зависимость доходит по цепочке. Снизу адаптер посередине зависит от обоих" style="margin:6px 0 10px">
+  <g fill="currentColor" font-family="system-ui" font-size="12" opacity="0.75">
+    <text x="14" y="16">фасад — зависимость просто стала длиннее</text>
+    <text x="14" y="146">инверсия — зависимость развернулась</text>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="14" y="32" width="160" height="54" rx="10"/>
+    <rect x="240" y="32" width="160" height="54" rx="10"/>
+    <rect x="466" y="32" width="160" height="54" rx="10"/>
+    <rect x="14" y="162" width="160" height="66" rx="10"/>
+    <rect x="240" y="162" width="160" height="66" rx="10"/>
+    <rect x="466" y="162" width="160" height="66" rx="10"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui">
+    <text x="32" y="56" font-size="13">userStore</text>
+    <text x="32" y="74" font-size="11" opacity="0.6">важный модуль</text>
+    <text x="258" y="56" font-size="13">userApi</text>
+    <text x="258" y="74" font-size="11" opacity="0.6">фасад</text>
+    <text x="484" y="56" font-size="13">httpClient</text>
+    <text x="484" y="74" font-size="11" opacity="0.6">меняется</text>
+    <text x="32" y="188" font-size="13">userStore</text>
+    <text x="32" y="205" font-size="11" opacity="0.6">объявляет контракт</text>
+    <text x="32" y="221" font-size="11" opacity="0.6">и ничего не импортирует</text>
+    <text x="258" y="188" font-size="13">адаптер</text>
+    <text x="258" y="205" font-size="11" opacity="0.6">знает обоих</text>
+    <text x="258" y="221" font-size="11" opacity="0.6">живёт в app</text>
+    <text x="484" y="188" font-size="13">httpClient</text>
+    <text x="484" y="205" font-size="11" opacity="0.6">по-прежнему</text>
+    <text x="484" y="221" font-size="11" opacity="0.6">ни о ком не знает</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.5" opacity="0.8">
+    <path d="M174 59 L234 59" marker-end="url(#a5)"/>
+    <path d="M400 59 L460 59" marker-end="url(#a5)"/>
+    <path d="M234 195 L180 195" marker-end="url(#a5)"/>
+    <path d="M400 195 L460 195" marker-end="url(#a5)"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="11" opacity="0.62">
+    <text x="176" y="106">изменение доезжает сюда по цепочке</text>
+    <text x="196" y="252">знание</text>
+    <text x="404" y="252">знание</text>
+  </g>
+  <defs><marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+
+<div class="termdef">
+  <b>Транзитивная зависимость</b> — зависимость через посредника.
+  <code>userStore</code> не знает про <code>httpClient</code> напрямую, но зависит от него
+  через <code>userApi</code>: цепочку не разорвать, изменение всё равно доедет.
+</div>
+
+<div class="quiz" data-quiz="choice" data-id="l2-facade">
+  <div class="qhead">Задание 6</div>
+  <p class="qtext">Почему фасада недостаточно, если цель — оторвать модуль от чужой изменчивости?</p>
+  <ul class="qopts">
+    <li data-ok data-why="Верно. Зависимость осталась, просто удлинилась. И тип по-прежнему приходит со стороны реализации.">
+      Зависимость осталась транзитивной, а тип объявляет не потребитель
+    </li>
+    <li data-why="Наоборот: фасад как раз обычно упрощает вызовы. Проблема не в удобстве, а в направлении стрелки.">
+      Фасад делает код сложнее и добавляет лишние вызовы
+    </li>
+    <li data-why="Фасады прекрасно работают в TypeScript. Дело не в языке, а в том, кто владеет типом.">
+      Фасады не поддерживаются структурной типизацией
+    </li>
+  </ul>
+  <div class="qafter">Это не значит, что фасады плохие. Просто фасад решает задачу
+  «спрятать сложность», а не задачу «развернуть зависимость».</div>
+</div>
+
+<h2>8. Ты делал это каждый день — просто в React</h2>
+
+<p>А теперь приятное. Половина приёмов из этого урока у тебя уже в руках.</p>
+
+<div class="termdef">
+  <b>Колбэк-проп</b> — функция, переданная компоненту пропом. Компонент её вызывает,
+  но не знает, что она делает. <code>onClick</code> — самый обычный пример.
+</div>
+
+<div class="termdef">
+  <b>Слот</b> — проп, в который передают готовую разметку (тип <code>ReactNode</code>),
+  а компонент просто вставляет её у себя. <code>children</code> — это тоже слот.
+</div>
+
+<div class="termdef">
+  <b>Render prop</b> — проп-функция, которая возвращает разметку. Компонент решает,
+  <em>где</em> и <em>сколько раз</em> её вызвать, но не решает, что именно нарисуется.
+</div>
+
+<pre><code>// ❌ карточка знает про кнопку, кнопка знает про стор, стор знает про API
 function TaskCard({ task }) {
   return &lt;div&gt;{task.title}&lt;DeleteTaskButton id={task.id} /&gt;&lt;/div&gt;;
 }
 
-// ✅ TaskCard не зависит ни на что, кроме своих пропсов
+// ✅ карточка не зависит ни от чего, кроме своих пропсов
 function TaskCard({ task, actions }: { task: Task; actions?: ReactNode }) {
   return &lt;div&gt;{task.title}{actions}&lt;/div&gt;;
 }
 
-// собирается наверху, в композиционном компоненте
+// собирают их уровнем выше
 &lt;TaskCard task={task} actions={&lt;DeleteButton onClick={() =&gt; remove(task.id)} /&gt;} /&gt;</code></pre>
 
-<p>Обрати внимание на второй эффект: дерево стало <strong>плоским</strong>. Вместо лесенки
-<code>App → TaskList → TaskCard → DeleteButton → store</code> получилось четыре независимых
-компонента и один сборщик над ними. Глубина вложенности — хороший косвенный индикатор
-зацепления: чем глубже, тем больше компонент знает о том, что внутри него.</p>
+<p>Побочный эффект — дерево компонентов становится плоским:</p>
 
-<div class="interview">
-  <div class="boxtitle">Готовый ответ на «приведи пример инверсии в React»</div>
-  <p>«Слот. Карточка задачи рендерит кнопку удаления, но не импортирует её — принимает
-  <code>ReactNode</code> пропом. Поток управления идёт от карточки к кнопке, а зависимости
-  от карточки к кнопке нет вообще: собирает их виджет уровнем выше. Это же объясняет,
-  почему в FSD сущность объявляет слот, а фича кладёт в него кнопку — иначе сущность
-  зависела бы от фичи, а это запрещённое направление.»</p>
+<svg viewBox="0 0 640 240" role="img" aria-label="Слева вложенная лесенка компонентов, справа плоский набор независимых компонентов под одним сборщиком" style="margin:6px 0 10px">
+  <g fill="currentColor" font-family="system-ui" font-size="12" opacity="0.75">
+    <text x="14" y="16">было: лесенка — каждый знает следующего</text>
+    <text x="360" y="16">стало: плоско — знает только сборщик</text>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.8">
+    <rect x="14" y="30" width="290" height="190" rx="9"/>
+    <rect x="34" y="66" width="250" height="140" rx="9"/>
+    <rect x="54" y="102" width="210" height="90" rx="9"/>
+    <rect x="74" y="138" width="170" height="40" rx="9"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="12">
+    <text x="26" y="48">App</text>
+    <text x="46" y="84">TaskList</text>
+    <text x="66" y="120">TaskCard</text>
+    <text x="86" y="163">DeleteButton</text>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.8">
+    <rect x="360" y="30" width="266" height="40" rx="9"/>
+    <rect x="360" y="106" width="124" height="42" rx="9"/>
+    <rect x="502" y="106" width="124" height="42" rx="9"/>
+    <rect x="360" y="166" width="124" height="42" rx="9"/>
+    <rect x="502" y="166" width="124" height="42" rx="9"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="12">
+    <text x="374" y="55">app — собирает всех</text>
+    <text x="374" y="132">TaskList</text>
+    <text x="516" y="132">TaskCard</text>
+    <text x="374" y="192">DeleteButton</text>
+    <text x="516" y="192">store</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.3" opacity="0.55">
+    <path d="M400 70 L400 102" marker-end="url(#a6)"/>
+    <path d="M470 70 L550 102" marker-end="url(#a6)"/>
+    <path d="M420 70 L420 162" marker-end="url(#a6)"/>
+    <path d="M500 70 L560 162" marker-end="url(#a6)"/>
+  </g>
+  <defs><marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+<p class="figcap">Глубина вложенности — хороший индикатор: чем глубже, тем больше компонент знает о чужих внутренностях.</p>
+
+<div class="quiz" data-quiz="choice" data-id="l2-slot">
+  <div class="qhead">Задание 7</div>
+  <p class="qtext">В FSD сущность <code>order</code> должна показать кнопку «отменить заказ»,
+  но кнопка — это фича, и импорт из сущности в фичу запрещён. Что делать?</p>
+  <ul class="qopts">
+    <li data-why="Тогда сущность будет зависеть от фичи — ровно то, что запрещено. Правило нарушено, просто спрятано.">
+      Импортировать кнопку напрямую и отключить правило линтера
+    </li>
+    <li data-ok data-why="Верно. Сущность объявляет слот типа ReactNode, кнопку кладёт виджет или страница сверху. Вызов идёт вниз, зависимости вниз нет.">
+      Сущность объявляет слот, кнопку кладёт виджет сверху
+    </li>
+    <li data-why="Перенос фичи в сущность смешает два уровня и раздует сущность. Проблему направления это не решает, а маскирует.">
+      Перенести кнопку внутрь сущности, раз она там нужна
+    </li>
+  </ul>
 </div>
 
-<h2>7. Context: когда это DI, а когда глобальная переменная</h2>
+<h2>9. Context: когда это DI, а когда глобальная переменная</h2>
 
-<p>React Context — не стейт-менеджер. По назначению это <strong>механизм доставки зависимости</strong>:
-способ использовать абстракцию до того, как где-то в корне подставили реализацию.
-Именно так устроены все инфраструктурные библиотеки:</p>
+<p>React Context по назначению — <strong>не хранилище состояния</strong>, а способ доставки
+зависимости: возможность пользоваться контрактом до того, как где-то наверху подставили
+реализацию. Так устроены все инфраструктурные библиотеки:</p>
 
 <ul>
-  <li><code>useQuery</code> зависит от абстрактного <code>QueryClient</code>, конкретный передаётся
-  в <code>&lt;QueryClientProvider&gt;</code> в <code>app</code>;</li>
-  <li><code>useNavigate</code> не знает, history-роутер это, hash или memory;</li>
+  <li><code>useQuery</code> работает с абстрактным <code>QueryClient</code>, конкретный
+  приезжает в <code>&lt;QueryClientProvider&gt;</code>;</li>
+  <li><code>useNavigate</code> не знает, роутер тут history, hash или memory;</li>
   <li><code>useSelector</code> не знает, из каких редьюсеров собран стор.</li>
 </ul>
 
-<p>Это инверсия — но обрати внимание, <em>в чью пользу</em>: библиотека защищена от твоего кода,
+<p>Заметь, <em>в чью пользу</em> здесь инверсия: это библиотека защищена от твоего кода,
 а не твой код от библиотеки.</p>
 
-<div class="warnbox">
-  <div class="boxtitle">Где контекст перестаёт быть DI</div>
-  <p>Если контекст объявлен <strong>рядом со своей реализацией</strong> и хранит её тип — это
-  уже не инверсия, а глобальная переменная с ограниченной областью видимости.
-  Признак тот же, что в разделе 4: тип пришёл со стороны реализации, а не со стороны потребителя.
-  Такой контекст повышает coupling: все потребители завязаны на конкретный модуль,
-  просто связь стала неявной. Лучше честный проп, чем контекст-невидимка.</p>
+<div class="quiz" data-quiz="choice" data-id="l2-context">
+  <div class="qhead">Задание 8</div>
+  <p class="qtext">По какому признаку отличить контекст-инверсию от контекста-глобальной-переменной?</p>
+  <ul class="qopts">
+    <li data-why="Количество контекстов ни о чём не говорит. Можно иметь один хороший и десять плохих.">
+      По количеству: один контекст на приложение — плохо, много — хорошо
+    </li>
+    <li data-ok data-why="Тот же детектор, что и везде: тип объявляет потребитель, реализация приезжает сверху — инверсия. Тип и реализация лежат вместе — это просто глобальная переменная.">
+      По тому, лежит ли реализация рядом с объявлением контекста
+    </li>
+    <li data-why="useContext используется в обоих случаях одинаково, по нему ничего не понять.">
+      По тому, используется ли useContext или useSyncExternalStore
+    </li>
+  </ul>
+  <div class="qafter">И ещё: контекст <em>декларативен</em> — не обернул в провайдер, получил ошибку
+  сразу и в понятном месте. Этим он отличается от сервис-локатора, который надо наполнять
+  вручную и который падает неожиданно.</div>
 </div>
 
-<p>Отсюда же ответ на вопрос «а контекст — это не сервис-локатор ли, который антипаттерн?».
-Нет, и вот почему: <strong>сервис-локатор императивен</strong> — все зависимости надо зарегистрировать
-до первого обращения, и при ленивой загрузке модуль может не успеть появиться.
-<strong>Контекст декларативен</strong>: не обёрнут в провайдер — падает сразу, явно и в предсказуемом месте.
-Плюс контекстов может быть много и каждый объявляет только свои зависимости,
-а локатор один на приложение.</p>
+<h2>10. Композиционный корень</h2>
 
-<h2>8. Композиционный корень</h2>
+<p>Если конкретика исчезла из модулей, значит, она куда-то переехала. Переехала она наверх.</p>
 
-<p>У всех примеров выше есть общее: конкретика откуда-то исчезла из модулей — значит,
-куда-то приехала. Это место называется <strong>composition root</strong>: <code>app/</code>, <code>main.tsx</code>,
-провайдеры, <code>composition.ts</code>.</p>
+<div class="termdef">
+  <b>Композиционный корень</b> (composition root) — единственное место, где абстрактное
+  встречается с конкретным: <code>app/</code>, <code>main.tsx</code>, провайдеры,
+  <code>composition.ts</code>.
+</div>
 
-<blockquote>
-Composition root — единственное место в приложении, где абстрактное встречается с конкретным.
-</blockquote>
+<svg viewBox="0 0 640 220" role="img" aria-label="Сверху app, который знает всех. Снизу четыре независимых модуля без связей между собой" style="margin:6px 0 10px">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="120" y="20" width="400" height="52" rx="10"/>
+    <rect x="14" y="140" width="140" height="56" rx="10"/>
+    <rect x="176" y="140" width="140" height="56" rx="10"/>
+    <rect x="338" y="140" width="140" height="56" rx="10"/>
+    <rect x="500" y="140" width="126" height="56" rx="10"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui">
+    <text x="142" y="44" font-size="13.5">app — композиционный корень</text>
+    <text x="142" y="62" font-size="11.5" opacity="0.62">знает всех, собирает всех, зависит от всех — это его работа</text>
+    <text x="30" y="166" font-size="12.5">checkout</text>
+    <text x="30" y="184" font-size="10.5" opacity="0.55">импортов нет</text>
+    <text x="192" y="166" font-size="12.5">tasks</text>
+    <text x="192" y="184" font-size="10.5" opacity="0.55">импортов нет</text>
+    <text x="354" y="166" font-size="12.5">permissions</text>
+    <text x="354" y="184" font-size="10.5" opacity="0.55">импортов нет</text>
+    <text x="516" y="166" font-size="12.5">api</text>
+    <text x="516" y="184" font-size="10.5" opacity="0.55">импортов нет</text>
+  </g>
+  <g stroke="currentColor" fill="none" stroke-width="1.3" opacity="0.55">
+    <path d="M200 72 L96 136" marker-end="url(#a7)"/>
+    <path d="M280 72 L244 136" marker-end="url(#a7)"/>
+    <path d="M360 72 L400 136" marker-end="url(#a7)"/>
+    <path d="M440 72 L552 136" marker-end="url(#a7)"/>
+  </g>
+  <g fill="currentColor" font-family="system-ui" font-size="11" opacity="0.6">
+    <text x="14" y="120">между собой они не связаны — ни одной горизонтальной стрелки</text>
+  </g>
+  <defs><marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+</svg>
+<p class="figcap">Правило движения: конкретика течёт вверх, абстракции — вниз.
+Толстый app — это не запах, это признак того, что всё сработало.</p>
 
-<p>Он <em>обязан</em> быть «жирным» и зависеть от всех — это его работа, а не запах.
-Правило движения: <strong>конкретика течёт вверх, абстракции — вниз</strong>.
-А признак здоровой системы — у самых ценных модулей вообще нет импортов из соседних модулей.</p>
+<h2>11. Где здесь SOLID</h2>
 
-<h2>9. Чем за это платят</h2>
+<p>Теперь можно вернуться к аббревиатуре — на подготовленную почву.
+SOLID придуман около 2000 года для языков с классами и наследованием.
+Дословно во фронт он не переносится, но три буквы из пяти работают отлично.</p>
 
-<p>Как и в первом уроке: любое решение — сделка, и обе стороны надо уметь назвать.</p>
+<h3>D — то, чем мы занимались весь урок</h3>
+<p>Dependency Inversion Principle: зависеть надо от абстракций, а не от реализаций.
+Это буква D. Всё, ты её уже знаешь.</p>
+
+<h3>S — одна причина для изменения</h3>
+
+<p>Формулировка «модуль должен делать одну вещь» бесполезна: «одна вещь» — резиновое понятие.
+Рабочая формулировка другая: <strong>у модуля должна быть ровно одна причина измениться,
+то есть ровно один заказчик правок</strong>.</p>
+
+<pre><code>function OrderCard({ order }) {
+  const money = new Intl.NumberFormat('kk-KZ', { ... }).format(order.total); // финансы
+  const canRefund = user.roles.includes('admin');                            // безопасность
+  const { data } = useQuery(['order', order.id], () =&gt; api.get(...));        // бэкенд
+  return ...;                                                                // дизайн
+}</code></pre>
+
+<div class="quiz" data-quiz="choice" data-id="l2-srp">
+  <div class="qhead">Задание 9</div>
+  <p class="qtext">Сколько причин для изменения у этого компонента?</p>
+  <ul class="qopts">
+    <li data-why="Считать надо не действия, а заказчиков. Здесь их видно четверых, и каждый придёт со своей правкой.">
+      Одна — он же рисует одну карточку заказа
+    </li>
+    <li data-ok data-why="Верно: финансы, безопасность, бэкенд и дизайн. Четыре команды будут править один файл и мешать друг другу.">
+      Четыре — по числу разных команд-заказчиков
+    </li>
+    <li data-why="Строк много, но SRP считает не строки, а источники требований.">
+      Столько, сколько строк в компоненте
+    </li>
+  </ul>
+</div>
+
+<h3>O — расширяем, не трогая</h3>
+
+<pre><code>// ❌ каждый новый случай = правка самого Modal
+&lt;Modal mode="edit" | "view" | "compact" | "danger" /&gt;
+
+// ✅ Modal не меняется никогда, меняется то, что в него кладут
+&lt;Modal header={&lt;EditTitle /&gt;} footer={&lt;SaveButton /&gt;}&gt;{form}&lt;/Modal&gt;</code></pre>
+
+<p>Первый вариант — это то самое <strong>control coupling</strong> из первого урока:
+снаружи флагом дёргают ветвление внутри. Второй — слот, то есть снова инверсия.</p>
+
+<h3>L и I — по одной честной фразе</h3>
 
 <table>
-  <tr><th>Удешевляем</th><th>Платим</th></tr>
-  <tr><td>Замену реализации: платёжка, транспорт, хранилище</td><td>Косвенность: чтобы понять, что реально вызовется, надо идти в composition root</td></tr>
-  <tr><td>Юнит-тесты без моков и перехвата сети</td><td>Больше кода: тип, фабрика, адаптер вместо одного импорта</td></tr>
-  <tr><td>Переиспользование и физический вынос модуля</td><td>«Go to definition» ведёт в тип, а не в реализацию</td></tr>
-  <tr><td>Разрыв запрещённых связей в FSD без хаков</td><td>Порог входа для новых людей в команде</td></tr>
+  <tr><th>Буква</th><th>Что говорить</th></tr>
+  <tr><td>L — Лисков</td><td>Без наследования во фронте почти не встречается. Живёт как
+  «не ломай контракт при расширении»: если <code>IconButton</code> — обёртка над <code>Button</code>,
+  она обязана принимать всё то же и вести себя так же.</td></tr>
+  <tr><td>I — разделение интерфейсов</td><td>Не заставляй потребителя знать о том, чем он не пользуется:
+  не проси весь объект <code>user</code>, если нужен только <code>userId</code>. Толстые контексты —
+  это же нарушение, и оно ещё и ререндеры даёт.</td></tr>
 </table>
 
-<div class="note">
+<h2>12. Чем за это платят</h2>
+
+<p>Как и в первом уроке: любое решение — сделка, и обе стороны надо уметь назвать вслух.</p>
+
+<table>
+  <tr><th>Что дешевеет</th><th>Чем платим</th></tr>
+  <tr><td>Замена реализации: платёжка, транспорт, хранилище</td><td>Косвенность: чтобы понять, что реально вызовется, надо идти в композиционный корень</td></tr>
+  <tr><td>Тесты без моков — подставил фейк и всё</td><td>Больше кода: контракт, фабрика, адаптер вместо одного импорта</td></tr>
+  <tr><td>Модуль можно физически вынуть и переиспользовать</td><td>«Перейти к определению» ведёт в тип, а не в рабочий код</td></tr>
+  <tr><td>Запрещённые по слоям связи разрываются без хаков</td><td>Новому человеку в команде дольше вникать</td></tr>
+</table>
+
+<div class="warnbox">
   <div class="boxtitle">Когда инвертировать НЕ надо</div>
   <ul>
-    <li><strong>Чистые утилиты.</strong> <code>formatDate</code>, <code>clamp</code>, <code>cn</code> —
-    у них нет изменчивости, инвертировать нечего.</li>
-    <li><strong>Одна реализация, и она не меняется.</strong> Инверсия «на будущее» — это ставка
-    на угаданное будущее, а первый урок был ровно о том, что угадывать не надо.</li>
-    <li><strong>Внутри одного модуля.</strong> Инверсия — инструмент для границ, а не для внутренностей.</li>
+    <li><strong>Чистые утилиты.</strong> <code>formatDate</code>, <code>clamp</code> — у них нечему
+    меняться, разворачивать нечего.</li>
+    <li><strong>Одна реализация, и она стабильна.</strong> Инверсия «на будущее» — ставка на
+    угаданное будущее, а первый урок был ровно о том, что угадывать не надо.</li>
+    <li><strong>Внутри одного модуля.</strong> Инверсия — инструмент для границ, не для внутренностей.</li>
   </ul>
   <p>Рабочее правило: <strong>инвертируй там, где начинается чужая изменчивость</strong> —
-  сеть, хранилище, платежи, аналитика, время и <code>Math.random</code>,
-  а также любая запрещённая по слоям связь.</p>
+  сеть, хранилище, платежи, аналитика, время и <code>Math.random</code> — и там, где связь
+  запрещена правилами слоёв.</p>
 </div>
 
-<h2>10. Как это звучит на собеседовании</h2>
+<h2>13. Как это звучит на собеседовании</h2>
 
 <div class="interview">
   <div class="boxtitle">Скрипт на 40 секунд</div>
   <p>«Инъекция — это <em>как</em> передали: аргументом, пропом, через контекст.
-  Инверсия — это <em>кто кого знает</em>: тип зависимости объявляет тот, кто её использует,
+  Инверсия — это <em>кто кого знает</em>: контракт объявляет тот, кто зависимостью пользуется,
   а реализация подстраивается под него и подставляется в композиционном корне.
-  Проверить легко: если тип импортирован из модуля-реализации — инверсии нет,
-  сколько бы слоёв ты ни построил. В React это обычно даже не требует интерфейсов:
+  Проверяется одним вопросом: если тип импортирован из модуля-реализации — инверсии нет,
+  сколько бы слоёв ни было построено. В React для этого обычно не нужны даже интерфейсы:
   слот, render prop и колбэк-проп — уже инверсия, потому что вызов идёт вниз,
   а зависимости вниз нет.»</p>
 </div>
@@ -390,12 +749,10 @@ Composition root — единственное место в приложении
 <div class="warnbox">
   <div class="boxtitle">Чего не делать</div>
   <ul>
-    <li>Не говорить «мы используем DI» про то, что просто принимает аргументы. Уточняй, чей тип.</li>
-    <li>Не называть фасад инверсией. Транзитивная зависимость никуда не делась.</li>
-    <li>Не предлагать DI-контейнер в React-проекте без крайне веской причины — это решение
-    для мира, где всё построено на классах и интерфейсах.</li>
-    <li>Не отвечать на «расскажи SOLID» пересказом пяти букв. Назови, какие три работают
-    во фронте и как они выглядят в компонентах.</li>
+    <li>Не называть «внедрением зависимостей» всё, что принимает аргументы. Уточняй, чей тип.</li>
+    <li>Не называть фасад инверсией — транзитивная зависимость никуда не делась.</li>
+    <li>Не предлагать DI-контейнер в React-проекте: это инструмент мира классов и интерфейсов.</li>
+    <li>Не пересказывать SOLID по буквам. Скажи, какие три работают во фронте и как выглядят в коде.</li>
   </ul>
 </div>
 
@@ -403,19 +760,20 @@ Composition root — единственное место в приложении
 
 <div class="cheat">
   <ul>
-    <li><strong>SOLID во фронте</strong>: рабочие — SRP, OCP, DIP. LSP и ISP — по одной честной фразе.</li>
-    <li><strong>SRP</strong> = одна причина для изменения = один заказчик правок, а не «делает одну вещь».</li>
-    <li><strong>OCP</strong> в React = слоты и пропсы вместо флагов режима.</li>
-    <li><strong>Инверсия</strong> = поток управления не совпадает с потоком зависимостей.</li>
+    <li><strong>Зависимость</strong> — чужой код, без которого мой не работает. Видна по <code>import</code>.</li>
+    <li><strong>Контракт</strong> — форма зависимости без содержимого. В TS это <code>type</code>.</li>
+    <li><strong>Две стрелки</strong>: поток управления — кто кого вызывает; поток зависимостей — кто про кого знает.</li>
+    <li><strong>Инверсия</strong> = эти две стрелки смотрят в разные стороны.</li>
     <li><strong>Инъекция</strong> = механизм доставки: аргумент, проп, контекст, контейнер.</li>
-    <li><strong>Injection без inversion</strong> возможен и бесполезен: передал аргументом чужой тип — остался привязан.</li>
-    <li><strong>Детектор</strong>: где объявлен тип зависимости? У потребителя — инверсия есть. У реализации — нет.</li>
-    <li><strong>Фасад ≠ инверсия</strong>: остаётся транзитивная зависимость, подмена только статическая.</li>
-    <li>В TS <strong>не нужен <code>implements</code></strong> — хватает структурной типизации, адаптер часто в одну стрелку.</li>
+    <li><strong>DIP</strong> = принцип (зачем), <strong>инверсия</strong> = приём (что делаем), <strong>инъекция</strong> = механизм (как передали).</li>
+    <li><strong>Детектор</strong>: где объявлен тип? У потребителя — инверсия есть. У реализации — нет.</li>
+    <li><strong>Инъекция без инверсии</strong> — самая частая подделка: чужой тип в сигнатуре.</li>
+    <li><strong>Фасад ≠ инверсия</strong>: зависимость остаётся транзитивной.</li>
+    <li>В TS <strong>не нужен <code>implements</code></strong> — работает структурная типизация, адаптер часто в одну стрелку.</li>
     <li><strong>Слот, render prop, колбэк-проп</strong> — инверсия, которой ты пользуешься каждый день.</li>
-    <li><strong>Context</strong> — механизм доставки зависимости, не стейт-менеджер. Реализация рядом с контекстом — это глобальная переменная.</li>
-    <li><strong>Composition root</strong> — единственное место встречи абстрактного и конкретного. Конкретика течёт вверх.</li>
-    <li><strong>Не инвертируй</strong> чистые утилиты, единственную стабильную реализацию и внутренности модуля.</li>
+    <li><strong>Context</strong> — доставка зависимости, а не хранилище состояния.</li>
+    <li><strong>Композиционный корень</strong> — единственное место встречи абстрактного и конкретного. Толстый app — это норма.</li>
+    <li><strong>Не инвертируй</strong> чистые утилиты, стабильную единственную реализацию и внутренности модуля.</li>
   </ul>
 </div>
 
@@ -424,18 +782,31 @@ Composition root — единственное место в приложении
 <ul>
   <li><strong>Kent C. Dodds, «Inversion of Control»</strong> —
   <a href="https://kentcdodds.com/blog/inversion-of-control">kentcdodds.com/blog/inversion-of-control</a>.
-  Лучший разбор темы именно для React-разработчика: одна и та же функция рефакторится
-  через инверсию шаг за шагом. Двадцать минут чтения.</li>
-  <li><strong>Robert C. Martin, «Clean Architecture»</strong>, главы 8 и 11 — первоисточник
-  формулировок OCP и DIP, включая «поток управления против потока зависимостей».</li>
+  Лучший разбор темы для React-разработчика: одна и та же функция рефакторится шаг за шагом.
+  Двадцать минут чтения.</li>
+  <li><strong>Robert C. Martin, «Clean Architecture»</strong>, главы 8 и 11 — откуда взялись
+  формулировки OCP и DIP, включая «поток управления против потока зависимостей».</li>
   <li><strong>Урок 2 курса Паромова</strong> (<code>docs/paromov-lessons/2.md</code>) — та же тема
-  с примерами на классах, функциях, контексте и компонентах.</li>
+  на классах, функциях, контексте и компонентах.</li>
 </ul>
+
+<h2>Итог</h2>
+
+<div class="quizscore" data-quiz-score>Задания в уроке ещё не решены.</div>
+
+<div class="quiz" data-quiz="reveal" data-id="l2-final">
+  <div class="qhead">Последнее — вслух, своими словами</div>
+  <p class="qtext">Объясни разницу между инверсией и инъекцией так, будто напротив сидит интервьюер.
+  Сформулируй вслух целиком, потом сверься.</p>
+  <div class="qanswer">Инъекция — механизм доставки: зависимость передали снаружи, а не взяли импортом.
+  Инверсия — направление знания: контракт объявляет потребитель, реализация подстраивается.
+  Инъекция без инверсии бывает и ничего не даёт: если тип пришёл из чужого модуля,
+  стрелка не развернулась. Проверка — один вопрос: где объявлен тип.</div>
+</div>
 
 <div class="note">
   <div class="boxtitle">Дальше</div>
-  <p>Сначала — <strong>практика ниже</strong>: упражнение <code>02-di-notifications</code>.
-  Оно ровно про этот урок, и вопросы будут понятнее после него. Потом возвращайся в чат
-  и пиши <strong>«готов к разбору урока 2»</strong> или <strong>«сдаю упражнение 02»</strong>.
-  Что непонятно — спрашивай сразу, а не копи до собеседования.</p>
+  <p>Разобрался — пиши в чате <strong>«готов к разбору урока 2»</strong>.
+  Ниже есть ещё упражнение на код, если захочешь потрогать руками, но сначала разбор.
+  Что осталось непонятным — спрашивай сразу, не копи до собеседования.</p>
 </div>
